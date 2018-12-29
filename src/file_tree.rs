@@ -12,7 +12,7 @@ pub struct NodeData {
 pub struct Inode {
     id: u64,
     pub data: NodeData,
-    children: collections::HashSet<u64>,
+    pub children: collections::BTreeSet<u64>,
 }
 
 fn build_root(val: u64) -> NodeData {
@@ -45,7 +45,7 @@ impl Inode {
         Inode {
             id,
             data,
-            children: collections::HashSet::new(),
+            children: collections::BTreeSet::new(),
         }
     }
 
@@ -103,7 +103,7 @@ impl FileMap {
         self.add_child(&1, data)
     }
 
-    pub fn get(&self, id: &u64) -> Option<&Inode> {
+    pub fn get(&self, id: &u64) -> Option<& Inode> {
         self.data.get(id)
     }
 
