@@ -10,6 +10,7 @@ fn main() {
 
     let fs = fsys::Fs::new();
 
+
     println!("{}", mnt);
     unsafe {
         let sys = fuse::spawn_mount(fs, &mnt, &[]).unwrap();

@@ -1,6 +1,7 @@
 use fuse::{FileAttr, FileType};
 use std::collections;
 use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::path;
 use time::Timespec;
 
@@ -11,25 +12,29 @@ pub struct NodeData {
 }
 
 #[derive(Debug)]
-pub struct Inode<'a> {
+pub struct Inode {
     id: u64,
     pub data: NodeData,
     pub children: collections::BTreeSet<u64>,
-    path: &'a path::Path,
+    pub name_map: collections::HashMap<OsString, u64>,
+    path: path::PathBuf,
 }
 
-impl<'a> Inode<'a> {
-    fn new(id: u64, data: NodeData) -> Inode<'a> {
+impl Inode {
+    fn new(id: u64, data: NodeData) -> Inode {
+        let path = path::PathBuf::from("wat");
         Inode {
             id,
-            path: path::Path::new("/tmp/wat"),
+            path,
             data,
             children: collections::BTreeSet::new(),
+            name_map: collections::HashMap::new()
         }
     }
 
-    fn add(&mut self, id: u64) {
+    fn add(&mut self, id: u64, name: std::ffi::OsString) {
         self.children.insert(id);
+        self.name_map.insert(name, id);
     }
 
     fn inc(&mut self) {
@@ -37,25 +42,33 @@ impl<'a> Inode<'a> {
     }
 }
 
-pub struct FileMap<'a> {
-    data: collections::HashMap<u64, Inode<'a>>,
+pub struct FileMap {
+    data: collections::HashMap<u64, Inode>,
 }
 
-impl<'a> FileMap<'a> {
-    pub fn add_child(&mut self, parent_id: &u64, data: NodeData) -> u64 {
+impl FileMap {
+    pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {
         let id: u64 = (self.data.len() + 1) as u64;
         let node = Inode::new(id, data);
         self.data.insert(id, node);
+        let path = name.to_os_string();
         self.data.entry(*parent_id).and_modify(|parent| {
-            parent.add(id);
+            parent.add(id, path);
         });
 
         id
     }
 
-    pub fn touch_file(&mut self, parent: u64, name: &OsStr) -> u64 {
+    pub fn touch_file(&mut self, parent: &u64, name: String) -> u64 {
         let mut file = build_dummy_file();
         file.kind = FileType::RegularFile;
+        let node = NodeData {
+            val: 1,
+            file_data: file
+        };
+        let n: &str = &name.clone();
+        let name = OsStr::new(&n);
+        let node_id = self.add_child(parent, node, &name);
         4
     }
 
@@ -69,7 +82,7 @@ impl<'a> FileMap<'a> {
         });
     }
 
-    pub fn new() -> FileMap<'static> {
+    pub fn new() -> FileMap {
         let mut f = FileMap {
             data: collections::HashMap::new(),
         };
@@ -85,7 +98,7 @@ impl<'a> FileMap<'a> {
     }
 
     pub fn add(&mut self, data: NodeData) -> u64 {
-        self.add_child(&1, data)
+        self.add_child(&1, data, OsStr::new("root"))
     }
 
     pub fn get(&self, id: &u64) -> Option<&Inode> {
@@ -107,7 +120,7 @@ impl<'a> FileMap<'a> {
     }
 }
 
-impl<'a> PartialEq for Inode<'a> {
+impl PartialEq for Inode {
     fn eq(&self, other: &Inode) -> bool {
         self.id == other.id
     }
@@ -185,7 +198,7 @@ fn remove() {
     assert_eq!(h.data.len(), 1);
 }
 
-fn build_with_children() -> FileMap<'static> {
+fn build_with_children() -> FileMap {
     let mut h = FileMap::new();
     let val = NodeData {
         val: 10,
@@ -198,7 +211,7 @@ fn build_with_children() -> FileMap<'static> {
         val: 11,
         file_data: build_dummy_file(),
     };
-    h.add_child(&id, child);
+    h.add_child(&id, child, &OsStr::new("fake file"));
 
     h
 }
@@ -217,7 +230,7 @@ fn add_child() {
         val: 12,
         file_data: build_dummy_file(),
     };
-    let child = h.add_child(&1, node);
+    let child = h.add_child(&1, node, &OsString::from("node"));
     let parent = h.get(&1).unwrap();
     assert!(parent.children.contains(&child));
 }
@@ -243,8 +256,8 @@ fn remove_nested_children() {
         val: 13,
         file_data: build_dummy_file(),
     };
-    h.add_child(&1, child);
-    h.add_child(&1, another);
+    h.add_child(&1, child, &OsString::from("child"));
+    h.add_child(&1, another, &OsString::from("another"));
 
     assert_eq!(h.data.len(), 5);
 
@@ -271,10 +284,10 @@ fn remove_nested_safely() {
         val: 15,
         file_data: build_dummy_file(),
     };
-    h.add_child(&2, child);
-    h.add_child(&2, another);
+    h.add_child(&2, child, &OsString::from("stuff"));
+    h.add_child(&2, another, &OsString::from("jerry"));
     let id = h.add(root);
-    let root_child_id = h.add_child(&id, root_child);
+    let root_child_id = h.add_child(&id, root_child, &OsString::from("root"));
 
     assert_eq!(h.data.len(), 7);
 
