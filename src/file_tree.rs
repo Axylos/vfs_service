@@ -1,21 +1,18 @@
+use fuse::{FileAttr, FileType};
 use std::collections;
 use time::Timespec;
-use fuse::{
-    FileAttr,
-    FileType
-};
 
 #[derive(Debug)]
 pub struct NodeData {
     val: u64,
-    pub file_data: FileAttr
+    pub file_data: FileAttr,
 }
 
 #[derive(Debug)]
 pub struct Inode {
     id: u64,
     pub data: NodeData,
-    children: collections::HashSet<u64>
+    children: collections::HashSet<u64>,
 }
 
 fn build_root(val: u64) -> NodeData {
@@ -38,8 +35,8 @@ fn build_root(val: u64) -> NodeData {
             blocks: 0,
             flags: 0,
             gid: 0,
-            uid: 0
-        }
+            uid: 0,
+        },
     }
 }
 
@@ -48,7 +45,7 @@ impl Inode {
         Inode {
             id,
             data,
-            children: collections::HashSet::new()
+            children: collections::HashSet::new(),
         }
     }
 
@@ -62,16 +59,15 @@ impl Inode {
 }
 
 pub struct FileMap {
-    data: collections::HashMap<u64, Inode>
+    data: collections::HashMap<u64, Inode>,
 }
 
 impl FileMap {
-    pub fn add_child(&mut self, parent_id: &u64, data: NodeData) -> u64{
+    pub fn add_child(&mut self, parent_id: &u64, data: NodeData) -> u64 {
         let id: u64 = (self.data.len() + 1) as u64;
         let node = Inode::new(id, data);
         self.data.insert(id, node);
         self.data.entry(*parent_id).and_modify(|parent| {
-
             parent.add(id);
         });
 
@@ -90,10 +86,13 @@ impl FileMap {
 
     pub fn new() -> FileMap {
         let mut f = FileMap {
-            data: collections::HashMap::new()
+            data: collections::HashMap::new(),
         };
 
-        let data = NodeData { val: 1, file_data: build_dummy_file() };
+        let data = NodeData {
+            val: 1,
+            file_data: build_dummy_file(),
+        };
         let node = Inode::new(1, data);
         f.data.insert(1, node);
 
@@ -118,7 +117,7 @@ impl FileMap {
         self.data.remove(id);
     }
 
-    pub fn has(&mut self, id: &u64) -> bool{
+    pub fn has(&mut self, id: &u64) -> bool {
         self.data.contains_key(id)
     }
 }
@@ -128,7 +127,6 @@ impl PartialEq for Inode {
         self.id == other.id
     }
 }
-
 
 fn build_dummy_file() -> FileAttr {
     let ts = Timespec::new(0, 0);
@@ -148,7 +146,7 @@ fn build_dummy_file() -> FileAttr {
         blocks: 0,
         flags: 0,
         gid: 0,
-        uid: 0
+        uid: 0,
     }
 }
 #[cfg(test)]
@@ -161,7 +159,10 @@ fn create_map() {
 #[test]
 fn add_inode() {
     let mut h = FileMap::new();
-    let node = NodeData { val: 1, file_data: build_dummy_file() };
+    let node = NodeData {
+        val: 1,
+        file_data: build_dummy_file(),
+    };
     h.add(node);
     assert!(!h.is_empty());
 }
@@ -169,11 +170,20 @@ fn add_inode() {
 #[test]
 fn get_node() {
     let mut h = FileMap::new();
-    let val = NodeData { val: 10, file_data: build_dummy_file() };
-    let other_val = NodeData { val: 11, file_data: build_dummy_file() };
+    let val = NodeData {
+        val: 10,
+        file_data: build_dummy_file(),
+    };
+    let other_val = NodeData {
+        val: 11,
+        file_data: build_dummy_file(),
+    };
 
     h.add(val);
-    h.add(NodeData { val: 11, file_data: build_dummy_file() });
+    h.add(NodeData {
+        val: 11,
+        file_data: build_dummy_file(),
+    });
     let node = h.get(&3).unwrap();
     assert_eq!(&node.data.val, &other_val.val);
 }
@@ -181,7 +191,10 @@ fn get_node() {
 #[test]
 fn remove() {
     let mut h = FileMap::new();
-    let val = NodeData { val: 10, file_data: build_dummy_file() };
+    let val = NodeData {
+        val: 10,
+        file_data: build_dummy_file(),
+    };
     let id = h.add(val);
     h.remove(&id);
     assert_eq!(h.data.len(), 1);
@@ -189,11 +202,17 @@ fn remove() {
 
 fn build_with_children() -> FileMap {
     let mut h = FileMap::new();
-    let val = NodeData { val: 10, file_data: build_dummy_file() };
+    let val = NodeData {
+        val: 10,
+        file_data: build_dummy_file(),
+    };
 
-    let id = h.add( val);
+    let id = h.add(val);
 
-    let child = NodeData { val: 11, file_data: build_dummy_file() };
+    let child = NodeData {
+        val: 11,
+        file_data: build_dummy_file(),
+    };
     h.add_child(&id, child);
 
     h
@@ -202,17 +221,21 @@ fn build_with_children() -> FileMap {
 #[test]
 fn add_child() {
     let mut h = FileMap::new();
-    let val = NodeData { val: 10, file_data: build_dummy_file() };
+    let val = NodeData {
+        val: 10,
+        file_data: build_dummy_file(),
+    };
 
     h.add(val);
 
-    let node = NodeData { val: 12, file_data: build_dummy_file() };
+    let node = NodeData {
+        val: 12,
+        file_data: build_dummy_file(),
+    };
     let child = h.add_child(&1, node);
     let parent = h.get(&1).unwrap();
     assert!(parent.children.contains(&child));
 }
-
-
 
 #[test]
 fn remove_with_children() {
@@ -227,8 +250,14 @@ fn remove_with_children() {
 #[test]
 fn remove_nested_children() {
     let mut h = build_with_children();
-    let child = NodeData { val: 12, file_data: build_dummy_file() };
-    let another = NodeData { val: 13, file_data: build_dummy_file() };
+    let child = NodeData {
+        val: 12,
+        file_data: build_dummy_file(),
+    };
+    let another = NodeData {
+        val: 13,
+        file_data: build_dummy_file(),
+    };
     h.add_child(&1, child);
     h.add_child(&1, another);
 
@@ -241,10 +270,22 @@ fn remove_nested_children() {
 #[test]
 fn remove_nested_safely() {
     let mut h = build_with_children();
-    let child = NodeData { val: 11, file_data: build_dummy_file() };
-    let another = NodeData { val: 13, file_data: build_dummy_file() };
-    let root = NodeData { val: 14, file_data: build_dummy_file() };
-    let root_child = NodeData { val: 15, file_data: build_dummy_file() };
+    let child = NodeData {
+        val: 11,
+        file_data: build_dummy_file(),
+    };
+    let another = NodeData {
+        val: 13,
+        file_data: build_dummy_file(),
+    };
+    let root = NodeData {
+        val: 14,
+        file_data: build_dummy_file(),
+    };
+    let root_child = NodeData {
+        val: 15,
+        file_data: build_dummy_file(),
+    };
     h.add_child(&2, child);
     h.add_child(&2, another);
     let id = h.add(root);
