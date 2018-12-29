@@ -5,3 +5,6 @@ authors = ["Axylos <robertdraketalley@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+fuse = "*"
+time = "*"
+libc = "*"
