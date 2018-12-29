@@ -1,12 +1,12 @@
 use crate::file_tree;
-use fuse::{FileAttr, FileType, Filesystem, ReplyAttr, Request, ReplyDirectory, ReplyCreate};
+use fuse::{FileAttr, FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyDirectory, Request};
 use libc::{ENOENT, ENOSYS};
-use time::Timespec;
-use std::path::Path;
 use std::ffi::OsStr;
+use std::path::Path;
+use time::Timespec;
 
 pub struct Fs {
-    file_tree: file_tree::FileMap,
+    file_tree: file_tree::FileMap<'static>,
 }
 
 impl Fs {
@@ -24,11 +24,25 @@ impl Filesystem for Fs {
         Ok(())
     }
 
-    fn create(&mut self, _req: &Request, parent: u64, name: &OsStr, mode: u32, flags: u32, reply: ReplyCreate) {
-
+    fn create(
+        &mut self,
+        _req: &Request,
+        parent: u64,
+        name: &OsStr,
+        mode: u32,
+        flags: u32,
+        reply: ReplyCreate,
+    ) {
         let now = time::now().to_timespec();
     }
-    fn readdir(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, mut reply: ReplyDirectory) {
+    fn readdir(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        offset: i64,
+        mut reply: ReplyDirectory,
+    ) {
         match self.file_tree.get(&ino) {
             Some(node) => {
                 if offset == 0 {
@@ -36,10 +50,9 @@ impl Filesystem for Fs {
                     reply.add(1, 1, FileType::Directory, &Path::new(".."));
                     reply.ok();
                 }
-            },
-            None => reply.error(ENOENT)
+            }
+            None => reply.error(ENOENT),
         };
-
     }
 
     fn getattr(&mut self, _req: &Request, ino: u64, reply: ReplyAttr) {

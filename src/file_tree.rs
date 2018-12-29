@@ -1,27 +1,28 @@
 use fuse::{FileAttr, FileType};
 use std::collections;
-use time::Timespec;
 use std::ffi::OsStr;
 use std::path;
+use time::Timespec;
 
 #[derive(Debug)]
-pub struct NodeData{
+pub struct NodeData {
     val: u64,
     pub file_data: FileAttr,
-    //pub path: &'a path::Path,
 }
 
 #[derive(Debug)]
-pub struct Inode {
+pub struct Inode<'a> {
     id: u64,
     pub data: NodeData,
     pub children: collections::BTreeSet<u64>,
+    path: &'a path::Path,
 }
 
-impl Inode {
-    fn new(id: u64, data: NodeData) -> Inode {
+impl<'a> Inode<'a> {
+    fn new(id: u64, data: NodeData) -> Inode<'a> {
         Inode {
             id,
+            path: path::Path::new("/tmp/wat"),
             data,
             children: collections::BTreeSet::new(),
         }
@@ -36,12 +37,11 @@ impl Inode {
     }
 }
 
-
-pub struct FileMap {
-    data: collections::HashMap<u64, Inode>,
+pub struct FileMap<'a> {
+    data: collections::HashMap<u64, Inode<'a>>,
 }
 
-impl FileMap {
+impl<'a> FileMap<'a> {
     pub fn add_child(&mut self, parent_id: &u64, data: NodeData) -> u64 {
         let id: u64 = (self.data.len() + 1) as u64;
         let node = Inode::new(id, data);
@@ -54,7 +54,6 @@ impl FileMap {
     }
 
     pub fn touch_file(&mut self, parent: u64, name: &OsStr) -> u64 {
-
         let mut file = build_dummy_file();
         file.kind = FileType::RegularFile;
         4
@@ -70,7 +69,7 @@ impl FileMap {
         });
     }
 
-    pub fn new() -> FileMap {
+    pub fn new() -> FileMap<'static> {
         let mut f = FileMap {
             data: collections::HashMap::new(),
         };
@@ -89,7 +88,7 @@ impl FileMap {
         self.add_child(&1, data)
     }
 
-    pub fn get(&self, id: &u64) -> Option<& Inode> {
+    pub fn get(&self, id: &u64) -> Option<&Inode> {
         self.data.get(id)
     }
 
@@ -108,7 +107,7 @@ impl FileMap {
     }
 }
 
-impl PartialEq for Inode {
+impl<'a> PartialEq for Inode<'a> {
     fn eq(&self, other: &Inode) -> bool {
         self.id == other.id
     }
@@ -186,7 +185,7 @@ fn remove() {
     assert_eq!(h.data.len(), 1);
 }
 
-fn build_with_children() -> FileMap {
+fn build_with_children() -> FileMap<'static> {
     let mut h = FileMap::new();
     let val = NodeData {
         val: 10,
