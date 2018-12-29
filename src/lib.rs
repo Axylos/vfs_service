@@ -35,13 +35,17 @@ struct FileMap {
 
 impl FileMap {
     fn add_child(&mut self, parent_id: &u64, data: NodeData) -> u64{
-        let child = self.add(data);
+        let id: u64 = (self.data.len() + 1) as u64;
+        let node = Inode::new(id, data);
+        self.data.insert(id, node);
         self.data.entry(*parent_id).and_modify(|parent| {
-            parent.add(child);
+
+            parent.add(id);
         });
 
-        child
+        id
     }
+
     pub fn is_empty(&self) -> bool {
         self.data.len() == 0
     }
@@ -53,17 +57,19 @@ impl FileMap {
     }
 
     fn new() -> FileMap {
-        FileMap {
+        let mut f = FileMap {
             data: collections::HashMap::new()
-        }
+        };
+
+        let data = NodeData { val: 1 };
+        let node = Inode::new(1, data);
+        f.data.insert(1, node);
+
+        f
     }
 
     fn add(&mut self, data: NodeData) -> u64 {
-        let id: u64 = (self.data.len() + 1) as u64;
-        let node = Inode::new(id, data);
-        self.data.insert(id, node);
-
-        id
+        self.add_child(&1, data)
     }
 
     fn get(&self, id: &u64) -> Option<&Inode> {
@@ -95,7 +101,7 @@ impl PartialEq for Inode {
 #[test]
 fn create_map() {
     let h = FileMap::new();
-    assert!(h.is_empty());
+    assert_eq!(h.data.len(), 1);
 }
 
 #[test]
@@ -114,7 +120,7 @@ fn get_node() {
 
     h.add(val);
     h.add(NodeData { val: 11 });
-    let node = h.get(&2).unwrap();
+    let node = h.get(&3).unwrap();
     assert_eq!(&node.data.val, &other_val.val);
 }
 
@@ -124,7 +130,7 @@ fn remove() {
     let val = NodeData { val: 10 };
     let id = h.add(val);
     h.remove(&id);
-    assert!(h.is_empty());
+    assert_eq!(h.data.len(), 1);
 }
 
 fn build_with_children() -> FileMap {
@@ -144,6 +150,7 @@ fn add_child() {
     let mut h = FileMap::new();
     let val = NodeData { val: 10 };
 
+    println!("{:?}", h.data);
     h.add(val);
 
     let node = NodeData { val: 12 };
@@ -172,7 +179,7 @@ fn remove_nested_children() {
     h.add_child(&1, child);
     h.add_child(&1, another);
 
-    assert_eq!(h.data.len(), 4);
+    assert_eq!(h.data.len(), 5);
 
     h.remove(&1);
     println!("{:?}", h.data);
@@ -191,10 +198,10 @@ fn remove_nested_safely() {
     let id = h.add(root);
     let root_child_id = h.add_child(&id, root_child);
 
-    assert_eq!(h.data.len(), 6);
+    assert_eq!(h.data.len(), 7);
 
-    h.remove(&1);
-    assert_eq!(h.data.len(), 2);
+    h.remove(&2);
+    assert_eq!(h.data.len(), 3);
     assert!(h.has(&root_child_id));
 }
 
