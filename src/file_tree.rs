@@ -1,11 +1,14 @@
 use fuse::{FileAttr, FileType};
 use std::collections;
 use time::Timespec;
+use std::ffi::OsStr;
+use std::path;
 
 #[derive(Debug)]
-pub struct NodeData {
+pub struct NodeData{
     val: u64,
     pub file_data: FileAttr,
+    //pub path: &'a path::Path,
 }
 
 #[derive(Debug)]
@@ -13,31 +16,6 @@ pub struct Inode {
     id: u64,
     pub data: NodeData,
     pub children: collections::BTreeSet<u64>,
-}
-
-fn build_root(val: u64) -> NodeData {
-    let ts = Timespec::new(0, 0);
-    let ttl = Timespec::new(1, 0);
-
-    NodeData {
-        val,
-        file_data: FileAttr {
-            ino: 1,
-            kind: FileType::Directory,
-            nlink: 0,
-            perm: 0o755,
-            rdev: 0,
-            size: 0,
-            atime: ts,
-            ctime: ts,
-            crtime: ts,
-            mtime: ts,
-            blocks: 0,
-            flags: 0,
-            gid: 0,
-            uid: 0,
-        },
-    }
 }
 
 impl Inode {
@@ -58,6 +36,7 @@ impl Inode {
     }
 }
 
+
 pub struct FileMap {
     data: collections::HashMap<u64, Inode>,
 }
@@ -72,6 +51,13 @@ impl FileMap {
         });
 
         id
+    }
+
+    pub fn touch_file(&mut self, parent: u64, name: &OsStr) -> u64 {
+
+        let mut file = build_dummy_file();
+        file.kind = FileType::RegularFile;
+        4
     }
 
     pub fn is_empty(&self) -> bool {

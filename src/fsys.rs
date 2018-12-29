@@ -1,8 +1,9 @@
 use crate::file_tree;
-use fuse::{FileAttr, FileType, Filesystem, ReplyAttr, Request, ReplyDirectory};
+use fuse::{FileAttr, FileType, Filesystem, ReplyAttr, Request, ReplyDirectory, ReplyCreate};
 use libc::{ENOENT, ENOSYS};
 use time::Timespec;
 use std::path::Path;
+use std::ffi::OsStr;
 
 pub struct Fs {
     file_tree: file_tree::FileMap,
@@ -21,6 +22,11 @@ impl Filesystem for Fs {
         println!("up and running");
 
         Ok(())
+    }
+
+    fn create(&mut self, _req: &Request, parent: u64, name: &OsStr, mode: u32, flags: u32, reply: ReplyCreate) {
+
+        let now = time::now().to_timespec();
     }
     fn readdir(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, mut reply: ReplyDirectory) {
         match self.file_tree.get(&ino) {
