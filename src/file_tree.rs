@@ -13,22 +13,22 @@ pub struct NodeData {
 
 #[derive(Debug)]
 pub struct Inode {
-    id: u64,
+    pub id: u64,
     pub data: NodeData,
     pub children: collections::BTreeSet<u64>,
     pub name_map: collections::HashMap<OsString, u64>,
-    path: path::PathBuf,
+    pub path: path::PathBuf,
 }
 
 impl Inode {
-    fn new(id: u64, data: NodeData) -> Inode {
-        let path = path::PathBuf::from("wat");
+    fn new(id: u64, data: NodeData, name: &OsStr) -> Inode {
+        let path = path::PathBuf::from(name);
         Inode {
             id,
             path,
             data,
             children: collections::BTreeSet::new(),
-            name_map: collections::HashMap::new()
+            name_map: collections::HashMap::new(),
         }
     }
 
@@ -37,6 +37,7 @@ impl Inode {
         self.name_map.insert(name, id);
     }
 
+    #[cfg(test)]
     fn inc(&mut self) {
         self.data.val += 1;
     }
@@ -49,7 +50,7 @@ pub struct FileMap {
 impl FileMap {
     pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {
         let id: u64 = (self.data.len() + 1) as u64;
-        let mut node = Inode::new(id, data);
+        let mut node = Inode::new(id, data, name);
         node.id = id;
         node.data.file_data.ino = id;
         self.data.insert(id, node);
@@ -57,7 +58,7 @@ impl FileMap {
         self.data.entry(*parent_id).and_modify(|parent| {
             parent.add(id, path);
         });
-        log::trace!("new entry: {:?}", self.data);
+        log::error!("new entry: {:?}", self.data);
 
         id
     }
@@ -73,17 +74,19 @@ impl FileMap {
         file.kind = FileType::RegularFile;
         let node = NodeData {
             val: 1,
-            file_data: file
+            file_data: file,
         };
         let n: &str = &name.clone();
         let name = OsStr::new(&n);
         self.add_child(parent, node, &name)
     }
 
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.data.len() == 0
     }
 
+    #[cfg(test)]
     fn inc(&mut self, id: &u64) {
         self.data.entry(*id).and_modify(|node| {
             node.inc();
@@ -99,12 +102,14 @@ impl FileMap {
             val: 1,
             file_data: build_dummy_file(),
         };
-        let node = Inode::new(1, data);
+        let name = OsStr::new("root");
+        let node = Inode::new(1, data, &name);
         f.data.insert(1, node);
 
         f
     }
 
+    #[cfg(test)]
     pub fn add(&mut self, data: NodeData) -> u64 {
         self.add_child(&1, data, OsStr::new("root"))
     }
@@ -113,6 +118,7 @@ impl FileMap {
         self.data.get(id)
     }
 
+    #[cfg(test)]
     pub fn remove(&mut self, id: &u64) {
         let x = &self.data.get(id).unwrap();
 
@@ -123,6 +129,7 @@ impl FileMap {
         self.data.remove(id);
     }
 
+    #[cfg(test)]
     pub fn has(&mut self, id: &u64) -> bool {
         self.data.contains_key(id)
     }
@@ -136,7 +143,7 @@ impl PartialEq for Inode {
 
 fn build_dummy_file() -> FileAttr {
     let ts = Timespec::new(0, 0);
-    let ttl = Timespec::new(1, 0);
+    let _ttl = Timespec::new(1, 0);
     let ino = 1;
     FileAttr {
         ino,
@@ -206,6 +213,7 @@ fn remove() {
     assert_eq!(h.data.len(), 1);
 }
 
+#[cfg(test)]
 fn build_with_children() -> FileMap {
     let mut h = FileMap::new();
     let val = NodeData {
