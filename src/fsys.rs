@@ -39,8 +39,8 @@ impl Filesystem for Fs {
     ) {
         let _now = time::now().to_timespec();
         log::error!("create: {}, {:?}, {}, {}", parent, name, mode, flags);
-        let n = name.to_str().unwrap().clone();
-        let id = self.file_tree.touch_file(&parent, String::from(n));
+        let n = name.to_str().unwrap().to_string();
+        let id = self.file_tree.touch_file(&parent, n);
         let file = self.file_tree.get(&id).unwrap().data.file_data;
         let now = time::now().to_timespec();
         log::error!("got through create");
@@ -71,7 +71,7 @@ impl Filesystem for Fs {
                     let mut ctr = 2 + offset as i64;
                     for id in children.range(idx..) {
                         let f = self.file_tree.get(&id).unwrap();
-                        reply.add(f.id, ctr, FileType::RegularFile, &f.path);
+                        reply.add(f.id, ctr, f.data.file_data.kind, &f.path);
                         ctr += 1;
                         log::error!("{:?}", f);
                     }

@@ -7,7 +7,6 @@ use time::Timespec;
 
 #[derive(Debug)]
 pub struct NodeData {
-    val: u64,
     pub file_data: FileAttr,
 }
 
@@ -73,7 +72,6 @@ impl FileMap {
         let mut file = build_dummy_file();
         file.kind = FileType::RegularFile;
         let node = NodeData {
-            val: 1,
             file_data: file,
         };
         let n: &str = &name.clone();
@@ -99,7 +97,6 @@ impl FileMap {
         };
 
         let data = NodeData {
-            val: 1,
             file_data: build_dummy_file(),
         };
         let name = OsStr::new("root");
