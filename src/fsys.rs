@@ -54,6 +54,11 @@ impl Filesystem for Fs {
         log::trace!("readdir: {}, {}, {}, {:?}", ino, fh, offset, req);
         match self.file_tree.get(&ino) {
             Some(node) => {
+                let children = &node.children;
+                if !children.is_empty() {
+                    let child = self.file_tree.get(children[0]);
+                }
+                let child = 
                 if offset == 0 {
                     reply.add(1, 0, FileType::Directory, &Path::new("."));
                     reply.add(1, 1, FileType::Directory, &Path::new(".."));
