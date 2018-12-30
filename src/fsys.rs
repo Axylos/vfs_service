@@ -1,5 +1,6 @@
+use log;
 use crate::file_tree;
-use fuse::{FileAttr, FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyDirectory, Request, ReplyEntry};
+use fuse::{FileAttr, FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyDirectory, Request, ReplyEntry, ReplyOpen};
 use libc::{ENOENT, ENOSYS};
 use std::ffi::OsStr;
 use std::path::Path;
@@ -19,7 +20,7 @@ impl Fs {
 
 impl Filesystem for Fs {
     fn init(&mut self, _req: &Request) -> Result<(), i32> {
-        println!("up and running");
+        log::trace!("up and running");
 
         Ok(())
     }
@@ -34,9 +35,13 @@ impl Filesystem for Fs {
         reply: ReplyCreate,
     ) {
         let now = time::now().to_timespec();
-        println!("create: {}, {:?}, {}, {}", parent, name, mode, flags);
+        log::trace!("create: {}, {:?}, {}, {}", parent, name, mode, flags);
         let n = name.to_str().unwrap().clone();
-        self.file_tree.touch_file(&parent, String::from(n));
+        let id = self.file_tree.touch_file(&parent, String::from(n));
+        let file = self.file_tree.get(&id).unwrap().data.file_data;
+        let now = time::now().to_timespec();
+        log::trace!("got through create");
+        reply.created(&now, &file, 1, 1, 2);
     }
     fn readdir(
         &mut self,
@@ -46,7 +51,7 @@ impl Filesystem for Fs {
         offset: i64,
         mut reply: ReplyDirectory,
     ) {
-        println!("readdir: {}, {}, {}, {:?}", ino, fh, offset, req);
+        log::trace!("readdir: {}, {}, {}, {:?}", ino, fh, offset, req);
         match self.file_tree.get(&ino) {
             Some(node) => {
                 if offset == 0 {
@@ -62,7 +67,7 @@ impl Filesystem for Fs {
     }
 
     fn getattr(&mut self, req: &Request, ino: u64, reply: ReplyAttr) {
-        println!("getattr: {}, {:?}", ino, req);
+        log::trace!("getattr: {}, {:?}", ino, req);
         match self.file_tree.get(&ino) {
             Some(file) => {
                 let ttl = Timespec::new(1, 0);
@@ -70,15 +75,35 @@ impl Filesystem for Fs {
                 reply.attr(&ttl, &file.data.file_data);
             }
             None => {
-                println!("none found");
+                log::trace!("none found");
                 reply.error(ENOENT);
             }
         }
     }
 
  fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {  
-     println!("lookup: {}, {:?}", parent, name);
+     log::trace!("lookup: {}, {:?}", parent, name);
      // TODO: Check to see if the file exists and reply with info
-     reply.error(ENOENT);
+     match self.file_tree.lookup_path(&parent, name) {
+         Some(file) => {
+             log::trace!("found file: {:?}", file);
+             let now = time::now().to_timespec();
+             reply.entry(&now, &file.data.file_data, 2);
+         },
+         None => reply.error(ENOENT)
+     }
+ }
+
+ fn open(&mut self, _req: &Request, ino: u64, flags: u32, reply: ReplyOpen) {
+     log::trace!("open: {}, {}", ino, flags);
+     reply.opened(ino, flags);
+
+ }
+
+ fn setattr(&mut self, _req: &Request, ino: u64, _mode: Option<u32>, _gid: Option<u32>, _uid: Option<u32>, _size: Option<u64>, _atime: Option<Timespec>, _mtime: Option<Timespec>, _fh: Option<u64>, _crtime: Option<Timespec>, _chgtime: Option<Timespec>, _bkuptime: Option<Timespec>, _flags: Option<u32>, reply: ReplyAttr) {
+     log::trace!("{}", ino);
+     let file = self.file_tree.get(&ino).unwrap();
+     let now = time::now().to_timespec();
+     reply.attr(&now, &file.data.file_data);
  }
 }

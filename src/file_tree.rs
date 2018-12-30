@@ -49,14 +49,23 @@ pub struct FileMap {
 impl FileMap {
     pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {
         let id: u64 = (self.data.len() + 1) as u64;
-        let node = Inode::new(id, data);
+        let mut node = Inode::new(id, data);
+        node.id = id;
+        node.data.file_data.ino = id;
         self.data.insert(id, node);
         let path = name.to_os_string();
         self.data.entry(*parent_id).and_modify(|parent| {
             parent.add(id, path);
         });
+        log::trace!("new entry: {:?}", self.data);
 
         id
+    }
+
+    pub fn lookup_path(&mut self, parent: &u64, name: &OsStr) -> Option<&Inode> {
+        let parent = self.get(parent).unwrap();
+        let id = parent.name_map.get(name)?;
+        self.get(id)
     }
 
     pub fn touch_file(&mut self, parent: &u64, name: String) -> u64 {
@@ -68,8 +77,7 @@ impl FileMap {
         };
         let n: &str = &name.clone();
         let name = OsStr::new(&n);
-        let node_id = self.add_child(parent, node, &name);
-        4
+        self.add_child(parent, node, &name)
     }
 
     pub fn is_empty(&self) -> bool {
