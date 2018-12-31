@@ -1,8 +1,8 @@
 use crate::file_tree;
 use crate::wiki;
 use fuse::{
-    FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyDirectory, ReplyEmpty, ReplyEntry,
-    ReplyOpen, Request, ReplyData, ReplyWrite
+    FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty,
+    ReplyEntry, ReplyOpen, ReplyWrite, Request,
 };
 use libc::ENOENT;
 use log;
@@ -43,8 +43,9 @@ impl Filesystem for Fs {
         let id = self.file_tree.touch_file(&parent, name);
         let file = self.file_tree.get(&id).unwrap().data.file_data;
         let now = time::now().to_timespec();
+        let ttl = now + time::Duration::hours(2);
         log::error!("got through create");
-        reply.created(&now, &file, 1, 1, 2);
+        reply.created(&ttl, &file, id, id, flags);
     }
     fn readdir(
         &mut self,
@@ -101,7 +102,7 @@ impl Filesystem for Fs {
     }
     */
     fn access(&mut self, _req: &Request, ino: u64, mask: u32, reply: ReplyEmpty) {
-        log::error!("{} {}", ino, mask);
+        log::error!("access: {} {}", ino, mask);
         self.file_tree.access_file(&ino);
         let f = self.file_tree.get(&ino).unwrap();
         reply.ok();
@@ -115,7 +116,9 @@ impl Filesystem for Fs {
                 log::error!("found file: {:?}", file);
                 let data = &file.data;
 
-                reply.entry(&file.ttl, &file.data.file_data, file.id + 1);
+                // the generation final arg needs to be the id.
+                // seems similar to fh wtf
+                reply.entry(&file.ttl, &file.data.file_data, file.id);
             }
             None => {
                 log::error!("no file found in lookup");
@@ -129,13 +132,33 @@ impl Filesystem for Fs {
         reply.opened(ino, flags);
     }
 
-    fn read(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, size: u32, reply: ReplyData) {
+    fn flush(&mut self, _req: &Request, ino: u64, fh: u64, lock_owner: u64, reply: ReplyEmpty) {
+        log::error!("flush: {}, {}, {}", ino, fh, lock_owner);
+        reply.ok();
+    }
+    fn read(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        offset: i64,
+        size: u32,
+        reply: ReplyData,
+    ) {
         log::error!("read: {}, {}, {}, {}", ino, fh, offset, size);
     }
 
-    fn write(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, data: &[u8], flags: u32, reply: ReplyWrite) {
+    fn write(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        offset: i64,
+        data: &[u8],
+        flags: u32,
+        reply: ReplyWrite,
+    ) {
         log::error!("write: {} {} {} {:?} {}", ino, fh, offset, data, flags);
-
     }
 
     fn setattr(

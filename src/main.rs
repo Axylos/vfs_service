@@ -2,9 +2,9 @@ use std::{env, io};
 mod logger;
 use log;
 
-mod wiki;
 mod file_tree;
 mod fsys;
+mod wiki;
 fn main() {
     logger::init();
     let mnt = match env::args().nth(1) {

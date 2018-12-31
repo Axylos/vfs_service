@@ -1,5 +1,6 @@
 use fuse::{FileAttr, FileType};
 use std::collections;
+use std::collections::hash_map;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::path;
@@ -24,7 +25,6 @@ impl Inode {
     pub fn access(&mut self) {
         let now = time::now().to_timespec();
         self.data.file_data.atime = now;
-        log::error!("ino={} now={:?} atime={:?}", self.id, now, self.data.file_data.atime);
     }
     fn new(id: u64, data: NodeData, name: &OsStr) -> Inode {
         let ttl = time::now().to_timespec() + time::Duration::hours(10);
@@ -46,7 +46,7 @@ impl Inode {
 
     #[cfg(test)]
     fn inc(&mut self) {
-        self.data.val += 1;
+        self.data.file_data.ino += 1;
     }
 }
 
@@ -76,19 +76,28 @@ impl FileMap {
         id
     }
 
-    pub fn lookup_path(&mut self, parent: &u64, name: &OsStr) -> Option<&Inode> {
+    fn resolve_path(&self, parent: &u64, name: &OsStr) -> Option<&u64> {
         let parent = self.get(parent).unwrap();
-        log::error!("lookup args: {:?} {:?}", parent.name_map, name);
-        let id = parent.name_map.get(name)?;
-        self.get(id)
+        parent.name_map.get(name)
+    }
+
+    pub fn lookup_path(&mut self, parent: &u64, name: &OsStr) -> Option<&Inode> {
+        // double the work so the result of an
+        // immutable borrow is not used for a mutable borrow
+        let id = self.resolve_path(parent, name)?;
+
+        self.data.entry(*id).and_modify(|file| {
+            file.access();
+        });
+
+        let id = self.resolve_path(parent, name).unwrap();
+        self.get(&id)
     }
 
     pub fn touch_file(&mut self, parent: &u64, name: &OsStr) -> u64 {
         let mut file = build_dummy_file();
         file.kind = FileType::RegularFile;
-        let node = NodeData {
-            file_data: file,
-        };
+        let node = NodeData { file_data: file };
         self.add_child(parent, node, name)
     }
 
@@ -153,7 +162,6 @@ impl PartialEq for Inode {
 
 fn build_dummy_file() -> FileAttr {
     let ts = time::now().to_timespec();
-    let _ttl = Timespec::new(1, 0);
     let ino = 1;
     FileAttr {
         ino,
@@ -183,7 +191,6 @@ fn create_map() {
 fn add_inode() {
     let mut h = FileMap::new();
     let node = NodeData {
-        val: 1,
         file_data: build_dummy_file(),
     };
     h.add(node);
@@ -194,28 +201,24 @@ fn add_inode() {
 fn get_node() {
     let mut h = FileMap::new();
     let val = NodeData {
-        val: 10,
         file_data: build_dummy_file(),
     };
     let other_val = NodeData {
-        val: 11,
         file_data: build_dummy_file(),
     };
 
     h.add(val);
     h.add(NodeData {
-        val: 11,
         file_data: build_dummy_file(),
     });
     let node = h.get(&3).unwrap();
-    assert_eq!(&node.data.val, &other_val.val);
+    assert_eq!(&node.data.file_data.ino, &3);
 }
 
 #[test]
 fn remove() {
     let mut h = FileMap::new();
     let val = NodeData {
-        val: 10,
         file_data: build_dummy_file(),
     };
     let id = h.add(val);
@@ -227,14 +230,12 @@ fn remove() {
 fn build_with_children() -> FileMap {
     let mut h = FileMap::new();
     let val = NodeData {
-        val: 10,
         file_data: build_dummy_file(),
     };
 
     let id = h.add(val);
 
     let child = NodeData {
-        val: 11,
         file_data: build_dummy_file(),
     };
     h.add_child(&id, child, &OsStr::new("fake file"));
@@ -246,14 +247,12 @@ fn build_with_children() -> FileMap {
 fn add_child() {
     let mut h = FileMap::new();
     let val = NodeData {
-        val: 10,
         file_data: build_dummy_file(),
     };
 
     h.add(val);
 
     let node = NodeData {
-        val: 12,
         file_data: build_dummy_file(),
     };
     let child = h.add_child(&1, node, &OsString::from("node"));
@@ -275,11 +274,9 @@ fn remove_with_children() {
 fn remove_nested_children() {
     let mut h = build_with_children();
     let child = NodeData {
-        val: 12,
         file_data: build_dummy_file(),
     };
     let another = NodeData {
-        val: 13,
         file_data: build_dummy_file(),
     };
     h.add_child(&1, child, &OsString::from("child"));
@@ -295,19 +292,15 @@ fn remove_nested_children() {
 fn remove_nested_safely() {
     let mut h = build_with_children();
     let child = NodeData {
-        val: 11,
         file_data: build_dummy_file(),
     };
     let another = NodeData {
-        val: 13,
         file_data: build_dummy_file(),
     };
     let root = NodeData {
-        val: 14,
         file_data: build_dummy_file(),
     };
     let root_child = NodeData {
-        val: 15,
         file_data: build_dummy_file(),
     };
     h.add_child(&2, child, &OsString::from("stuff"));
@@ -325,8 +318,8 @@ fn remove_nested_safely() {
 #[test]
 fn inc_data() {
     let mut h = build_with_children();
-    let old = h.get(&1).unwrap().data.val;
+    let old = h.get(&1).unwrap().data.file_data.ino;
     h.inc(&1);
-    let new = h.get(&1).unwrap().data.val;
+    let new = h.get(&1).unwrap().data.file_data.ino;
     assert_eq!(old, new - 1);
 }
