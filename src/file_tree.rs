@@ -1,6 +1,5 @@
 use fuse::{FileAttr, FileType};
 use std::collections;
-use std::collections::hash_map;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::path;
@@ -9,6 +8,7 @@ use time::Timespec;
 #[derive(Debug)]
 pub struct NodeData {
     pub file_data: FileAttr,
+    pub content: String,
 }
 
 #[derive(Debug)]
@@ -55,6 +55,16 @@ pub struct FileMap {
 }
 
 impl FileMap {
+    pub fn write(&mut self, ino: u64, data: &[u8], flags: u32) -> u32 {
+        let str = String::from_utf8_lossy(data).to_string();
+        log::error!("write2: {} {:?} {}", ino, data, flags);
+        self.data.entry(ino).and_modify(|f| {
+            f.data.content = str;
+        });
+        let str = String::from_utf8_lossy(data).to_string();
+        let size = std::mem::size_of_val(&str) as u32;
+        size
+    }
     pub fn access_file(&mut self, ino: &u64) {
         self.data.entry(*ino).and_modify(|file| {
             file.access();
@@ -97,7 +107,10 @@ impl FileMap {
     pub fn touch_file(&mut self, parent: &u64, name: &OsStr) -> u64 {
         let mut file = build_dummy_file();
         file.kind = FileType::RegularFile;
-        let node = NodeData { file_data: file };
+        let node = NodeData {
+            content: String::from(""),
+            file_data: file,
+        };
         self.add_child(parent, node, name)
     }
 
@@ -119,6 +132,7 @@ impl FileMap {
         };
 
         let data = NodeData {
+            content: String::from(""),
             file_data: build_dummy_file(),
         };
         let name = OsStr::new("root");
@@ -190,9 +204,7 @@ fn create_map() {
 #[test]
 fn add_inode() {
     let mut h = FileMap::new();
-    let node = NodeData {
-        file_data: build_dummy_file(),
-    };
+    let node = build_dummy_node();
     h.add(node);
     assert!(!h.is_empty());
 }
@@ -200,17 +212,12 @@ fn add_inode() {
 #[test]
 fn get_node() {
     let mut h = FileMap::new();
-    let val = NodeData {
-        file_data: build_dummy_file(),
-    };
-    let other_val = NodeData {
-        file_data: build_dummy_file(),
-    };
+    let val = build_dummy_node();
+    let _other_val = build_dummy_node();
 
     h.add(val);
-    h.add(NodeData {
-        file_data: build_dummy_file(),
-    });
+    h.add(build_dummy_node());
+
     let node = h.get(&3).unwrap();
     assert_eq!(&node.data.file_data.ino, &3);
 }
@@ -218,9 +225,7 @@ fn get_node() {
 #[test]
 fn remove() {
     let mut h = FileMap::new();
-    let val = NodeData {
-        file_data: build_dummy_file(),
-    };
+    let val = build_dummy_node();
     let id = h.add(val);
     h.remove(&id);
     assert_eq!(h.data.len(), 1);
@@ -229,15 +234,11 @@ fn remove() {
 #[cfg(test)]
 fn build_with_children() -> FileMap {
     let mut h = FileMap::new();
-    let val = NodeData {
-        file_data: build_dummy_file(),
-    };
+    let val = build_dummy_node();
 
     let id = h.add(val);
 
-    let child = NodeData {
-        file_data: build_dummy_file(),
-    };
+    let child = build_dummy_node();
     h.add_child(&id, child, &OsStr::new("fake file"));
 
     h
@@ -246,15 +247,11 @@ fn build_with_children() -> FileMap {
 #[test]
 fn add_child() {
     let mut h = FileMap::new();
-    let val = NodeData {
-        file_data: build_dummy_file(),
-    };
+    let val = build_dummy_node();
 
     h.add(val);
 
-    let node = NodeData {
-        file_data: build_dummy_file(),
-    };
+    let node = build_dummy_node();
     let child = h.add_child(&1, node, &OsString::from("node"));
     let parent = h.get(&1).unwrap();
     assert!(parent.children.contains(&child));
@@ -273,12 +270,8 @@ fn remove_with_children() {
 #[test]
 fn remove_nested_children() {
     let mut h = build_with_children();
-    let child = NodeData {
-        file_data: build_dummy_file(),
-    };
-    let another = NodeData {
-        file_data: build_dummy_file(),
-    };
+    let child = build_dummy_node();
+    let another = build_dummy_node();
     h.add_child(&1, child, &OsString::from("child"));
     h.add_child(&1, another, &OsString::from("another"));
 
@@ -288,21 +281,19 @@ fn remove_nested_children() {
     assert!(h.is_empty());
 }
 
+fn build_dummy_node() -> NodeData {
+    NodeData {
+        content: String::from(""),
+        file_data: build_dummy_file(),
+    }
+}
 #[test]
 fn remove_nested_safely() {
     let mut h = build_with_children();
-    let child = NodeData {
-        file_data: build_dummy_file(),
-    };
-    let another = NodeData {
-        file_data: build_dummy_file(),
-    };
-    let root = NodeData {
-        file_data: build_dummy_file(),
-    };
-    let root_child = NodeData {
-        file_data: build_dummy_file(),
-    };
+    let child = build_dummy_node();
+    let another = build_dummy_node();
+    let root = build_dummy_node();
+    let root_child = build_dummy_node();
     h.add_child(&2, child, &OsString::from("stuff"));
     h.add_child(&2, another, &OsString::from("jerry"));
     let id = h.add(root);

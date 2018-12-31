@@ -104,7 +104,7 @@ impl Filesystem for Fs {
     fn access(&mut self, _req: &Request, ino: u64, mask: u32, reply: ReplyEmpty) {
         log::error!("access: {} {}", ino, mask);
         self.file_tree.access_file(&ino);
-        let f = self.file_tree.get(&ino).unwrap();
+        let _f = self.file_tree.get(&ino).unwrap();
         reply.ok();
     }
 
@@ -114,7 +114,7 @@ impl Filesystem for Fs {
         match self.file_tree.lookup_path(&parent, name) {
             Some(file) => {
                 log::error!("found file: {:?}", file);
-                let data = &file.data;
+                let _data = &file.data;
 
                 // the generation final arg needs to be the id.
                 // seems similar to fh wtf
@@ -143,7 +143,7 @@ impl Filesystem for Fs {
         fh: u64,
         offset: i64,
         size: u32,
-        reply: ReplyData,
+        _reply: ReplyData,
     ) {
         log::error!("read: {}, {}, {}, {}", ino, fh, offset, size);
     }
@@ -159,6 +159,8 @@ impl Filesystem for Fs {
         reply: ReplyWrite,
     ) {
         log::error!("write: {} {} {} {:?} {}", ino, fh, offset, data, flags);
+        let size = self.file_tree.write(ino, data, flags);
+        reply.written(size)
     }
 
     fn setattr(

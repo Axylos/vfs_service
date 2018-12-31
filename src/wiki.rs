@@ -1,4 +1,4 @@
-use serde_json::{Error, Value};
+use serde_json::Error;
 use std::process::Command;
 
 pub fn query() -> Result<String, Error> {
