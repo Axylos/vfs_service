@@ -160,6 +160,10 @@ impl Filesystem for Fs {
         reply.data(d)
     }
 
+    fn unlink(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEmpty) {
+        log::error!("unlink {} {:?}", parent, name);
+        reply.ok();
+    }
     fn write(
         &mut self,
         _req: &Request,
@@ -173,7 +177,7 @@ impl Filesystem for Fs {
         log::error!("write: {} {} {} {:?} {}", ino, fh, offset, data, flags);
         let w_size = std::mem::size_of_val(data) as u32;
         log::error!("write size: {}", w_size as u32);
-        let size = self.file_tree.write(ino, data, flags);
+        let size = self.file_tree.write(ino, data, flags, offset);
         log::error!("size={}", size);
         // must return exact same size as data that was requested to be written
         // or else stupid io invalid arg error or something happens

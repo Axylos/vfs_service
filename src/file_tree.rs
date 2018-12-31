@@ -56,7 +56,7 @@ pub struct FileMap {
 }
 
 impl FileMap {
-    pub fn write(&mut self, ino: u64, data: &[u8], flags: u32) -> u32 {
+    pub fn write(&mut self, ino: u64, data: &[u8], flags: u32, offset: i64) -> u32 {
         let str = String::from_utf8_lossy(data).trim().to_string();
 
         let size = std::mem::size_of_val(&str.as_bytes());
@@ -65,17 +65,27 @@ impl FileMap {
 
         self.data.entry(ino).and_modify(|f| {
             let now = time::now().to_timespec();
-            f.data.content = data.to_vec();
+            let old = &f.data.content;
+            let z: Vec<u8> = old.to_vec();
+            let mut new = z.iter().take(offset as usize).cloned().collect::<Vec<_>>();
+
+            new.extend(data.iter().cloned().collect::<Vec<_>>());
+
+            new.extend(
+                z.iter()
+                    .skip(offset as usize + data.len())
+                    .collect::<Vec<_>>(),
+            );
+            //let z: &[u8] = new.into();
+            f.data.content = new;
             let d: &[u8] = &f.data.content;
             let s = d.len();
             f.data.file_data.size = s as u64;
             f.data.file_data.ctime = now;
             f.data.file_data.atime = now;
-            log::error!("64 size={}", s as u64);
         });
 
         let size = size as u32;
-        log::error!("32 size={}", size);
         size
     }
     pub fn access_file(&mut self, ino: &u64) {
