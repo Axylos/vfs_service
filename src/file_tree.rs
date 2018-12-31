@@ -13,6 +13,7 @@ pub struct NodeData {
 #[derive(Debug)]
 pub struct Inode {
     pub id: u64,
+    pub ttl: Timespec,
     pub data: NodeData,
     pub children: collections::BTreeSet<u64>,
     pub name_map: collections::HashMap<OsString, u64>,
@@ -20,12 +21,19 @@ pub struct Inode {
 }
 
 impl Inode {
+    pub fn access(&mut self) {
+        let now = time::now().to_timespec();
+        self.data.file_data.atime = now;
+        log::error!("ino={} now={:?} atime={:?}", self.id, now, self.data.file_data.atime);
+    }
     fn new(id: u64, data: NodeData, name: &OsStr) -> Inode {
+        let ttl = time::now().to_timespec() + time::Duration::hours(10);
         let path = path::PathBuf::from(name);
         Inode {
             id,
             path,
             data,
+            ttl,
             children: collections::BTreeSet::new(),
             name_map: collections::HashMap::new(),
         }
@@ -47,6 +55,12 @@ pub struct FileMap {
 }
 
 impl FileMap {
+    pub fn access_file(&mut self, ino: &u64) {
+        self.data.entry(*ino).and_modify(|file| {
+            file.access();
+        });
+    }
+
     pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {
         let id: u64 = (self.data.len() + 1) as u64;
         let mut node = Inode::new(id, data, name);
@@ -64,19 +78,18 @@ impl FileMap {
 
     pub fn lookup_path(&mut self, parent: &u64, name: &OsStr) -> Option<&Inode> {
         let parent = self.get(parent).unwrap();
+        log::error!("lookup args: {:?} {:?}", parent.name_map, name);
         let id = parent.name_map.get(name)?;
         self.get(id)
     }
 
-    pub fn touch_file(&mut self, parent: &u64, name: String) -> u64 {
+    pub fn touch_file(&mut self, parent: &u64, name: &OsStr) -> u64 {
         let mut file = build_dummy_file();
         file.kind = FileType::RegularFile;
         let node = NodeData {
             file_data: file,
         };
-        let n: &str = &name.clone();
-        let name = OsStr::new(&n);
-        self.add_child(parent, node, &name)
+        self.add_child(parent, node, name)
     }
 
     #[cfg(test)]
@@ -139,7 +152,7 @@ impl PartialEq for Inode {
 }
 
 fn build_dummy_file() -> FileAttr {
-    let ts = Timespec::new(0, 0);
+    let ts = time::now().to_timespec();
     let _ttl = Timespec::new(1, 0);
     let ino = 1;
     FileAttr {
@@ -148,12 +161,12 @@ fn build_dummy_file() -> FileAttr {
         nlink: 0,
         perm: 0o755,
         rdev: 0,
-        size: 0,
+        size: 100,
         atime: ts,
         ctime: ts,
         crtime: ts,
         mtime: ts,
-        blocks: 0,
+        blocks: 100,
         flags: 0,
         gid: 0,
         uid: 0,

@@ -2,6 +2,7 @@ use std::{env, io};
 mod logger;
 use log;
 
+mod wiki;
 mod file_tree;
 mod fsys;
 fn main() {

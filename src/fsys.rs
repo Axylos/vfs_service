@@ -1,7 +1,8 @@
 use crate::file_tree;
+use crate::wiki;
 use fuse::{
     FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyDirectory, ReplyEmpty, ReplyEntry,
-    ReplyOpen, Request,
+    ReplyOpen, Request, ReplyData, ReplyWrite
 };
 use libc::ENOENT;
 use log;
@@ -39,8 +40,7 @@ impl Filesystem for Fs {
     ) {
         let _now = time::now().to_timespec();
         log::error!("create: {}, {:?}, {}, {}", parent, name, mode, flags);
-        let n = name.to_str().unwrap().to_string();
-        let id = self.file_tree.touch_file(&parent, n);
+        let id = self.file_tree.touch_file(&parent, name);
         let file = self.file_tree.get(&id).unwrap().data.file_data;
         let now = time::now().to_timespec();
         log::error!("got through create");
@@ -86,9 +86,7 @@ impl Filesystem for Fs {
         log::error!("getattr: {}", ino);
         match self.file_tree.get(&ino) {
             Some(file) => {
-                let ttl = Timespec::new(1, 0);
-                //let ts = Timespec::new(0, 0);
-                reply.attr(&ttl, &file.data.file_data);
+                reply.attr(&file.ttl, &file.data.file_data);
             }
             None => {
                 log::error!("none found");
@@ -97,8 +95,15 @@ impl Filesystem for Fs {
         }
     }
 
+    /*
+    fn opendir(&mut self, _req: &Request, ino: u64, flags: u32, reply: ReplyOpen) {
+        log::error!("opendir: {}, {}", ino, flags);
+    }
+    */
     fn access(&mut self, _req: &Request, ino: u64, mask: u32, reply: ReplyEmpty) {
-        log::error!("access: {} {}", ino, mask);
+        log::error!("{} {}", ino, mask);
+        self.file_tree.access_file(&ino);
+        let f = self.file_tree.get(&ino).unwrap();
         reply.ok();
     }
 
@@ -108,16 +113,29 @@ impl Filesystem for Fs {
         match self.file_tree.lookup_path(&parent, name) {
             Some(file) => {
                 log::error!("found file: {:?}", file);
-                let now = time::now().to_timespec();
-                reply.entry(&now, &file.data.file_data, 2);
+                let data = &file.data;
+
+                reply.entry(&file.ttl, &file.data.file_data, file.id + 1);
             }
-            None => reply.error(ENOENT),
+            None => {
+                log::error!("no file found in lookup");
+                reply.error(ENOENT);
+            }
         }
     }
 
     fn open(&mut self, _req: &Request, ino: u64, flags: u32, reply: ReplyOpen) {
         log::error!("open: {}, {}", ino, flags);
         reply.opened(ino, flags);
+    }
+
+    fn read(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, size: u32, reply: ReplyData) {
+        log::error!("read: {}, {}, {}, {}", ino, fh, offset, size);
+    }
+
+    fn write(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, data: &[u8], flags: u32, reply: ReplyWrite) {
+        log::error!("write: {} {} {} {:?} {}", ino, fh, offset, data, flags);
+
     }
 
     fn setattr(
@@ -137,7 +155,7 @@ impl Filesystem for Fs {
         _flags: Option<u32>,
         reply: ReplyAttr,
     ) {
-        log::error!("{}", ino);
+        log::error!("set attr: {}", ino);
         let file = self.file_tree.get(&ino).unwrap();
         let now = time::now().to_timespec();
         reply.attr(&now, &file.data.file_data);
