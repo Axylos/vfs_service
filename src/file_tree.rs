@@ -186,7 +186,6 @@ impl FileMap {
         self.data.get_mut(id)
     }
 
-    #[cfg(test)]
     pub fn remove(&mut self, id: &u64) {
         let x = &self.data.get(id).unwrap();
 
@@ -195,6 +194,17 @@ impl FileMap {
             self.remove(child);
         }
         self.data.remove(id);
+    }
+
+    pub fn unlink(&mut self, parent: &u64, name: &OsStr) {
+        let ino = self.resolve_path(parent, name).unwrap();
+        let i = ino.clone();
+        self.remove(&i);
+
+        let f = self.get_mut(parent).unwrap();
+        f.name_map.remove(&name.to_os_string());
+        f.children.remove(&i);
+        log::error!("{:?}", self.data);
     }
 
     #[cfg(test)]

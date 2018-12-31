@@ -162,6 +162,7 @@ impl Filesystem for Fs {
 
     fn unlink(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEmpty) {
         log::error!("unlink {} {:?}", parent, name);
+        self.file_tree.unlink(&parent, name);
         reply.ok();
     }
     fn write(
