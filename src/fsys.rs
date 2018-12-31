@@ -147,11 +147,17 @@ impl Filesystem for Fs {
     ) {
         log::error!("read: {}, {}, {}, size={}", ino, fh, offset, size);
         let f = self.file_tree.get(&ino).unwrap();
+        let data = &f.data.content;
+        // this is just a stupid way
+        // to push a value into a byte slice
+        // has to be a better way
+        let mut v = data.to_vec();
+        let eof = 04;
+        v.push(eof);
 
         let o = offset as usize;
-        let d: &[u8] = &f.data.content[0..];
-        let bits = d;
-        reply.data(bits)
+        let d: &[u8] = &v[o..];
+        reply.data(d)
     }
 
     fn write(
@@ -189,7 +195,7 @@ impl Filesystem for Fs {
         _crtime: Option<Timespec>,
         chgtime: Option<Timespec>,
         bkuptime: Option<Timespec>,
-        flags: Option<u32>,
+        _flags: Option<u32>,
         reply: ReplyAttr,
     ) {
         log::error!(
