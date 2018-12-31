@@ -149,7 +149,8 @@ impl Filesystem for Fs {
         let f = self.file_tree.get(&ino).unwrap();
 
         let o = offset as usize;
-        let bits = &f.data.content.as_bytes()[o..];
+        let d: &[u8] = &f.data.content[0..];
+        let bits = d;
         reply.data(bits)
     }
 
@@ -164,9 +165,14 @@ impl Filesystem for Fs {
         reply: ReplyWrite,
     ) {
         log::error!("write: {} {} {} {:?} {}", ino, fh, offset, data, flags);
+        let w_size = std::mem::size_of_val(data) as u32;
+        log::error!("write size: {}", w_size as u32);
         let size = self.file_tree.write(ino, data, flags);
         log::error!("size={}", size);
-        reply.written(size)
+        // must return exact same size as data that was requested to be written
+        // or else stupid io invalid arg error or something happens
+        // really stupid
+        reply.written(w_size)
     }
 
     fn setattr(

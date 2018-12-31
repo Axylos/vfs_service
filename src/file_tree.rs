@@ -9,7 +9,7 @@ use time::Timespec;
 #[derive(Debug)]
 pub struct NodeData {
     pub file_data: FileAttr,
-    pub content: String,
+    pub content: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -65,8 +65,9 @@ impl FileMap {
 
         self.data.entry(ino).and_modify(|f| {
             let now = time::now().to_timespec();
-            f.data.content = str;
-            let s = std::mem::size_of_val(&f.data.content.as_bytes());
+            f.data.content = data.to_vec();
+            let d: &[u8] = &f.data.content;
+            let s = d.len();
             f.data.file_data.size = s as u64;
             f.data.file_data.ctime = now;
             f.data.file_data.atime = now;
@@ -120,7 +121,7 @@ impl FileMap {
         let mut file = build_dummy_file();
         file.kind = FileType::RegularFile;
         let node = NodeData {
-            content: String::from(""),
+            content: Vec::new(),
             file_data: file,
         };
         self.add_child(parent, node, name)
@@ -144,7 +145,7 @@ impl FileMap {
         };
 
         let data = NodeData {
-            content: String::from(""),
+            content: Vec::new(),
             file_data: build_dummy_file(),
         };
         let name = OsStr::new("root");
@@ -295,7 +296,7 @@ fn remove_nested_children() {
 
 fn build_dummy_node() -> NodeData {
     NodeData {
-        content: String::from(""),
+        content: Vec::new(),
         file_data: build_dummy_file(),
     }
 }
