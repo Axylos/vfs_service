@@ -27,6 +27,7 @@ impl Inode {
         let now = time::now().to_timespec();
         self.data.file_data.atime = now;
     }
+
     fn new(id: u64, data: NodeData, name: &OsStr) -> Inode {
         let ttl = time::now().to_timespec() + time::Duration::hours(10);
         let path = path::PathBuf::from(name);
@@ -56,6 +57,13 @@ pub struct FileMap {
 }
 
 impl FileMap {
+    pub fn clear_file(&mut self, ino: &u64) {
+        self.data.entry(*ino).and_modify(|f| {
+            f.data.file_data.size = 0;
+            f.data.content = [].to_vec();
+        });
+    }
+
     pub fn write(&mut self, ino: u64, data: &[u8], flags: u32, offset: i64) -> u32 {
         let str = String::from_utf8_lossy(data).trim().to_string();
 
@@ -172,6 +180,10 @@ impl FileMap {
 
     pub fn get(&self, id: &u64) -> Option<&Inode> {
         self.data.get(id)
+    }
+
+    pub fn get_mut(&mut self, id: &u64) -> Option<&mut Inode> {
+        self.data.get_mut(id)
     }
 
     #[cfg(test)]

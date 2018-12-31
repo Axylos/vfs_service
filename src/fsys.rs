@@ -211,8 +211,11 @@ impl Filesystem for Fs {
             bkuptime,
             chgtime
         );
-        let file = self.file_tree.get(&ino).unwrap();
         let now = time::now().to_timespec();
+        if let Some(_) = size {
+            self.file_tree.clear_file(&ino);
+        }
+        let file = self.file_tree.get(&ino).unwrap();
         reply.attr(&now, &file.data.file_data);
     }
 
