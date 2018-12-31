@@ -143,9 +143,14 @@ impl Filesystem for Fs {
         fh: u64,
         offset: i64,
         size: u32,
-        _reply: ReplyData,
+        reply: ReplyData,
     ) {
-        log::error!("read: {}, {}, {}, {}", ino, fh, offset, size);
+        log::error!("read: {}, {}, {}, size={}", ino, fh, offset, size);
+        let f = self.file_tree.get(&ino).unwrap();
+
+        let o = offset as usize;
+        let bits = &f.data.content.as_bytes()[o..];
+        reply.data(bits)
     }
 
     fn write(
@@ -160,6 +165,7 @@ impl Filesystem for Fs {
     ) {
         log::error!("write: {} {} {} {:?} {}", ino, fh, offset, data, flags);
         let size = self.file_tree.write(ino, data, flags);
+        log::error!("size={}", size);
         reply.written(size)
     }
 
@@ -170,19 +176,41 @@ impl Filesystem for Fs {
         _mode: Option<u32>,
         _gid: Option<u32>,
         _uid: Option<u32>,
-        _size: Option<u64>,
-        _atime: Option<Timespec>,
-        _mtime: Option<Timespec>,
+        size: Option<u64>,
+        atime: Option<Timespec>,
+        mtime: Option<Timespec>,
         _fh: Option<u64>,
         _crtime: Option<Timespec>,
-        _chgtime: Option<Timespec>,
-        _bkuptime: Option<Timespec>,
-        _flags: Option<u32>,
+        chgtime: Option<Timespec>,
+        bkuptime: Option<Timespec>,
+        flags: Option<u32>,
         reply: ReplyAttr,
     ) {
-        log::error!("set attr: {}", ino);
+        log::error!(
+            "set attr: {} {:?} {:?} {:?} {:?} {:?}",
+            ino,
+            size,
+            atime,
+            mtime,
+            bkuptime,
+            chgtime
+        );
         let file = self.file_tree.get(&ino).unwrap();
         let now = time::now().to_timespec();
         reply.attr(&now, &file.data.file_data);
+    }
+
+    fn release(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        flags: u32,
+        lock_owner: u64,
+        flush: bool,
+        reply: ReplyEmpty,
+    ) {
+        log::error!("release {} {} {} {} {}", ino, fh, flags, lock_owner, flush);
+        reply.ok();
     }
 }

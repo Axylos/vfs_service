@@ -1,5 +1,6 @@
 use fuse::{FileAttr, FileType};
 use std::collections;
+use std::collections::hash_map::Entry;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::path;
@@ -56,13 +57,24 @@ pub struct FileMap {
 
 impl FileMap {
     pub fn write(&mut self, ino: u64, data: &[u8], flags: u32) -> u32 {
-        let str = String::from_utf8_lossy(data).to_string();
+        let str = String::from_utf8_lossy(data).trim().to_string();
+
+        let size = std::mem::size_of_val(&str.as_bytes());
+        log::error!("size={}", size);
         log::error!("write2: {} {:?} {}", ino, data, flags);
+
         self.data.entry(ino).and_modify(|f| {
+            let now = time::now().to_timespec();
             f.data.content = str;
+            let s = std::mem::size_of_val(&f.data.content.as_bytes());
+            f.data.file_data.size = s as u64;
+            f.data.file_data.ctime = now;
+            f.data.file_data.atime = now;
+            log::error!("64 size={}", s as u64);
         });
-        let str = String::from_utf8_lossy(data).to_string();
-        let size = std::mem::size_of_val(&str) as u32;
+
+        let size = size as u32;
+        log::error!("32 size={}", size);
         size
     }
     pub fn access_file(&mut self, ino: &u64) {
@@ -183,7 +195,7 @@ fn build_dummy_file() -> FileAttr {
         nlink: 0,
         perm: 0o755,
         rdev: 0,
-        size: 100,
+        size: 0,
         atime: ts,
         ctime: ts,
         crtime: ts,
