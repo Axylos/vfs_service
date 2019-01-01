@@ -190,27 +190,36 @@ impl Filesystem for Fs {
         &mut self,
         _req: &Request,
         ino: u64,
-        _mode: Option<u32>,
-        _gid: Option<u32>,
-        _uid: Option<u32>,
+        mode: Option<u32>,
+        gid: Option<u32>,
+        uid: Option<u32>,
         size: Option<u64>,
         atime: Option<Timespec>,
         mtime: Option<Timespec>,
-        _fh: Option<u64>,
-        _crtime: Option<Timespec>,
+        fh: Option<u64>,
+        crtime: Option<Timespec>,
         chgtime: Option<Timespec>,
         bkuptime: Option<Timespec>,
-        _flags: Option<u32>,
+        flags: Option<u32>,
         reply: ReplyAttr,
     ) {
         log::error!(
-            "set attr: {} {:?} {:?} {:?} {:?} {:?}",
+            "set attr: ino={} mode={:?} gid={:?} \
+             uid={:?} size={:?} atime{:?} \
+             mtime={:?} fh={:?} crtime={:?} \
+             chgtime={:?} bkuptime={:?} flags={:?}",
             ino,
+            mode,
+            gid,
+            uid,
             size,
             atime,
             mtime,
+            fh,
+            crtime,
+            chgtime,
             bkuptime,
-            chgtime
+            flags
         );
         let now = time::now().to_timespec();
         if let Some(_) = size {

@@ -54,6 +54,7 @@ impl Inode {
 
 pub struct FileMap {
     data: collections::HashMap<u64, Inode>,
+    ino_ctr: u64,
 }
 
 impl FileMap {
@@ -103,7 +104,8 @@ impl FileMap {
     }
 
     pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {
-        let id: u64 = (self.data.len() + 1) as u64;
+        let id: u64 = (self.ino_ctr) as u64;
+        self.ino_ctr += 1;
         let mut node = Inode::new(id, data, name);
         node.id = id;
         node.data.file_data.ino = id;
@@ -160,6 +162,7 @@ impl FileMap {
     pub fn new() -> FileMap {
         let mut f = FileMap {
             data: collections::HashMap::new(),
+            ino_ctr: 2,
         };
 
         let data = NodeData {
@@ -198,6 +201,7 @@ impl FileMap {
 
     pub fn unlink(&mut self, parent: &u64, name: &OsStr) {
         let ino = self.resolve_path(parent, name).unwrap();
+        log::error!("about to unlink: {}", ino);
         let i = ino.clone();
         self.remove(&i);
 
@@ -276,6 +280,23 @@ fn remove() {
     assert_eq!(h.data.len(), 1);
 }
 
+#[test]
+fn path_resolution() {
+    let mut fs = build_with_children();
+    let node = build_dummy_node();
+    fs.add_child(&1, node, OsStr::new("foo"));
+    let node = build_dummy_node();
+    let id = fs.add_child(&1, node, OsStr::new("foo~"));
+    let data = fs.get(&id).unwrap();
+    assert!(data.path.to_str() == Some("foo~"));
+    fs.unlink(&1, OsStr::new("foo~"));
+    match fs.lookup_path(&1, OsStr::new("foo~")) {
+        Some(_n) => panic!("bad match"),
+        None => (),
+    }
+
+    assert!(fs.get(&2).unwrap().id == 2);
+}
 #[cfg(test)]
 fn build_with_children() -> FileMap {
     let mut h = FileMap::new();
