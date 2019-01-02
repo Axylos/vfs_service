@@ -1,14 +1,17 @@
 use crate::file_tree;
+use std::str;
 use crate::wiki;
 use fuse::{
     FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty,
-    ReplyEntry, ReplyOpen, ReplyWrite, Request,
+    ReplyEntry, ReplyOpen, ReplyWrite, Request, ReplyXattr
 };
 use libc::ENOENT;
 use log;
 use std::ffi::OsStr;
 use std::path;
 use time::Timespec;
+
+const EOF: u64 = 04;
 
 pub struct Fs {
     file_tree: file_tree::FileMap,
@@ -152,8 +155,8 @@ impl Filesystem for Fs {
         // to push a value into a byte slice
         // has to be a better way
         let mut v = data.to_vec();
-        let eof = 04;
-        v.push(eof);
+        //disable for now seems to work on os x
+        //v.push(EOF);
 
         let o = offset as usize;
         let d: &[u8] = &v[o..];
@@ -184,6 +187,82 @@ impl Filesystem for Fs {
         // or else stupid io invalid arg error or something happens
         // really stupid
         reply.written(w_size)
+    }
+
+    fn getxattr(
+        &mut self, 
+        _req: &Request, 
+        ino: u64, 
+        name: &OsStr, 
+        size: u32, 
+        reply: ReplyXattr
+        ) {
+        log::error!("getxattr: ino={} name={:?} size={}", ino, name, size);
+        let f = self.file_tree.get(&ino).unwrap();
+        log::error!("found xattr {:?}", f.xattr);
+        match f.xattr.get(name) {
+            Some(attr) => {
+                let bytes = attr.clone().into_bytes();
+                log::error!("bytes: {:?}", &bytes);
+
+                reply.data(&bytes);
+            }
+            None => reply.error(61)
+        
+        }
+
+    }
+
+
+    fn listxattr(
+        &mut self, 
+        _req: &Request, 
+        ino: u64, 
+        size: u32, 
+        reply: ReplyXattr
+        ) {
+        let f = self.file_tree.get(&ino).unwrap();
+        let names: Vec<u8> = f.xattr.keys()
+            .map(|s| s.clone().into_string()
+                 .unwrap()
+                 .into_bytes())
+            .flatten()
+            .collect();
+
+        reply.data(&names[..]);
+    } 
+
+
+    fn setxattr(
+        &mut self, 
+        _req: &Request, 
+        ino: u64, 
+        name: &OsStr, 
+        value: &[u8], 
+        flags: u32, 
+        position: u32, 
+        reply: ReplyEmpty
+
+        ) {
+
+        log::error!("setxattr: ino={} name={:?} value={:?} flags={} position={}", ino, name, value, flags, position);
+
+        match self.file_tree.get_mut(&ino) {
+            Some(f) => {
+                match str::from_utf8(value) {
+                    Ok(data) => {
+                        log::error!("data: {}", data);
+                        f.xattr.insert(name.to_os_string(), data.to_string());
+
+                    }
+                    Err(e) => log::error!("err: {:?}", e)
+                }
+                log::error!("{:?}", str::from_utf8(value));
+                reply.ok();
+            }
+            None => reply.error(ENOENT)
+
+        }
     }
 
     fn setattr(

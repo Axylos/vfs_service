@@ -19,6 +19,7 @@ pub struct Inode {
     pub data: NodeData,
     pub children: collections::BTreeSet<u64>,
     pub name_map: collections::HashMap<OsString, u64>,
+    pub xattr: collections::HashMap<OsString, String>, 
     pub path: path::PathBuf,
 }
 
@@ -36,6 +37,7 @@ impl Inode {
             path,
             data,
             ttl,
+            xattr: collections::HashMap::new(),
             children: collections::BTreeSet::new(),
             name_map: collections::HashMap::new(),
         }
