@@ -3,7 +3,7 @@ use std::str;
 use crate::wiki;
 use fuse::{
     FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty,
-    ReplyEntry, ReplyOpen, ReplyWrite, Request, ReplyXattr
+    ReplyEntry, ReplyOpen, ReplyWrite, Request, ReplyXattr, ReplyIoctl
 };
 use libc::ENOENT;
 use log;
@@ -30,6 +30,20 @@ impl Filesystem for Fs {
         log::error!("up and running");
 
         Ok(())
+    }
+
+    fn ioctl(
+        &mut self, 
+        _req: &Request, 
+        ino: u64, 
+        fh: u64, 
+        flags: u32, 
+        cmd: u32, 
+        data: Option<&[u8]>, 
+        size: u32, 
+        reply: ReplyIoctl
+        ) {
+        log::error!("ioctl: ino={} cmd={} data={:?} size={:?}, fh={}, flags={}", ino, cmd, data, size, fh, flags);
     }
 
     fn create(

@@ -106,7 +106,7 @@ impl FileMap {
     }
 
     pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {
-        let id: u64 = (self.ino_ctr) as u64;
+        let id: u64 = (self.ino_ctr.clone()) as u64;
         self.ino_ctr += 1;
         let mut node = Inode::new(id, data, name);
         node.id = id;
@@ -141,7 +141,13 @@ impl FileMap {
 
     pub fn touch_file(&mut self, parent: &u64, name: &OsStr) -> u64 {
         let mut file = build_dummy_file();
+        if name.to_str().unwrap() == "foo" {
+            log::error!("making a foo");
+            file.kind = FileType::CharDevice;
+        } else {
+
         file.kind = FileType::RegularFile;
+        }
         let node = NodeData {
             content: Vec::new(),
             file_data: file,

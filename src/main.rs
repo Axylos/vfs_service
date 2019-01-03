@@ -1,4 +1,5 @@
 use std::{env, io};
+extern crate drakey_fuse as fuse;
 mod logger;
 use log;
 
