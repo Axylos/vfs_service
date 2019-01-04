@@ -1,57 +1,7 @@
 use fuse::{FileAttr, FileType};
 use std::collections;
-use std::ffi::OsStr;
-use std::ffi::OsString;
-use std::path;
-use time::Timespec;
-
-#[derive(Debug)]
-pub struct NodeData {
-    pub file_data: FileAttr,
-    pub content: Vec<u8>,
-}
-
-#[derive(Debug)]
-pub struct Inode {
-    pub id: u64,
-    pub ttl: Timespec,
-    pub data: NodeData,
-    pub children: collections::BTreeSet<u64>,
-    pub name_map: collections::HashMap<OsString, u64>,
-    pub xattr: collections::HashMap<OsString, String>,
-    pub path: path::PathBuf,
-}
-
-impl Inode {
-    pub fn access(&mut self) {
-        let now = time::now().to_timespec();
-        self.data.file_data.atime = now;
-    }
-
-    fn new(id: u64, data: NodeData, name: &OsStr) -> Inode {
-        let ttl = time::now().to_timespec() + time::Duration::hours(10);
-        let path = path::PathBuf::from(name);
-        Inode {
-            id,
-            path,
-            data,
-            ttl,
-            xattr: collections::HashMap::new(),
-            children: collections::BTreeSet::new(),
-            name_map: collections::HashMap::new(),
-        }
-    }
-
-    fn add(&mut self, id: u64, name: std::ffi::OsString) {
-        self.children.insert(id);
-        self.name_map.insert(name, id);
-    }
-
-    #[cfg(test)]
-    fn inc(&mut self) {
-        self.data.file_data.ino += 1;
-    }
-}
+use std::ffi::{OsStr};
+use crate::fsys::inode::{Inode, NodeData};
 
 pub struct FileMap {
     data: collections::HashMap<u64, Inode>,
@@ -98,10 +48,41 @@ impl FileMap {
         let size = size as u32;
         size
     }
-    pub fn access_file(&mut self, ino: &u64) {
-        self.data.entry(*ino).and_modify(|file| {
-            file.access();
-        });
+
+    pub fn get_xattr_list(&self, ino: &u64) -> Vec<u8> {
+        let f = self.get(&ino).unwrap();
+        let names: Vec<u8> = f
+            .xattr
+            .keys()
+            .map(|s| {
+                match s.clone().into_string() {
+                    Ok(val) => val.into_bytes(),
+                    Err(_) => "invalid key name".to_owned().into_bytes()
+                }
+            })
+            .flatten()
+            .collect();
+
+        names
+    }
+    pub fn getxattr<'a>(&self, ino: &'a u64, name: &OsStr) -> Option<Vec<u8>> {
+        let f = self.get(&ino)?;
+        log::error!("found xattr {:?}", f.xattr);
+        let attr = f.xattr.get(name)?;
+        let bytes = attr.to_string().into_bytes();
+        Some(bytes)
+    }
+
+    pub fn access_file(&mut self, ino: &u64) -> Result<(), &str> {
+        match self.data.contains_key(ino) {
+            true => {
+                self.data.entry(*ino).and_modify(|file| {
+                    file.access();
+                });
+                Ok(())
+            },
+            false => Err("invalid key")
+        }
     }
 
     pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {

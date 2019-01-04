@@ -1,4 +1,5 @@
-use crate::file_tree;
+mod file_tree;
+mod inode;
 use std::str;
 //use crate::wiki;
 use fuse::{
@@ -96,8 +97,12 @@ impl Filesystem for Fs {
                         }
                     }
                 }
+                reply.ok();
             }
-            None => reply.error(ENOENT),
+            None => {
+                log::error!("file not found ino={}", ino);
+                reply.error(ENOENT);
+            }
         };
     }
 
@@ -121,9 +126,12 @@ impl Filesystem for Fs {
     */
     fn access(&mut self, _req: &Request, ino: u64, mask: u32, reply: ReplyEmpty) {
         log::error!("access: {} {}", ino, mask);
-        self.file_tree.access_file(&ino);
-        let _f = self.file_tree.get(&ino).unwrap();
-        reply.ok();
+        match self.file_tree.access_file(&ino) {
+            Ok(()) => {
+                reply.ok();
+            },
+            Err(_) => reply.error(ENOENT)
+        }
     }
 
     fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
@@ -162,20 +170,24 @@ impl Filesystem for Fs {
         offset: i64,
         size: u32,
         reply: ReplyData,
-    ) {
+        ) {
         log::error!("read: {}, {}, {}, size={}", ino, fh, offset, size);
-        let f = self.file_tree.get(&ino).unwrap();
-        let data = &f.data.content;
-        // this is just a stupid way
-        // to push a value into a byte slice
-        // has to be a better way
-        let v = data.to_vec();
-        //disable for now seems to work on os x
-        //v.push(EOF);
+        match self.file_tree.get(&ino) {
+            Some(f) => {
+                let data = &f.data.content;
+                // this is just a stupid way
+                // to push a value into a byte slice
+                // has to be a better way
+                let v = data.to_vec();
+                //disable for now seems to work on os x
+                //v.push(EOF);
 
-        let o = offset as usize;
-        let d: &[u8] = &v[o..];
-        reply.data(d)
+                let o = offset as usize;
+                let d: &[u8] = &v[o..];
+                reply.data(d)
+            },
+            None => reply.error(ENOENT)
+        }
     }
 
     fn unlink(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEmpty) {
@@ -206,29 +218,18 @@ impl Filesystem for Fs {
 
     fn getxattr(&mut self, _req: &Request, ino: u64, name: &OsStr, size: u32, reply: ReplyXattr) {
         log::error!("getxattr: ino={} name={:?} size={}", ino, name, size);
-        let f = self.file_tree.get(&ino).unwrap();
-        log::error!("found xattr {:?}", f.xattr);
-        match f.xattr.get(name) {
-            Some(attr) => {
-                let bytes = attr.clone().into_bytes();
+        match self.file_tree.getxattr(&ino, name) {
+            Some(bytes) => {
                 log::error!("bytes: {:?}", &bytes);
-
                 reply.data(&bytes);
-            }
+            },
             None => reply.error(61),
         }
     }
 
     fn listxattr(&mut self, _req: &Request, ino: u64, _size: u32, reply: ReplyXattr) {
-        let f = self.file_tree.get(&ino).unwrap();
-        let names: Vec<u8> = f
-            .xattr
-            .keys()
-            .map(|s| s.clone().into_string().unwrap().into_bytes())
-            .flatten()
-            .collect();
-
-        reply.data(&names[..]);
+        let data = self.file_tree.get_xattr_list(&ino);
+        reply.data(&data[..]);
     }
 
     fn setxattr(

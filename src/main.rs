@@ -2,8 +2,8 @@ use std::{env, io};
 mod logger;
 use log;
 
-mod file_tree;
 mod fsys;
+
 mod wiki;
 fn main() {
     logger::init();
