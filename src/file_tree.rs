@@ -1,6 +1,5 @@
 use fuse::{FileAttr, FileType};
 use std::collections;
-use std::collections::hash_map::Entry;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::path;
@@ -19,7 +18,7 @@ pub struct Inode {
     pub data: NodeData,
     pub children: collections::BTreeSet<u64>,
     pub name_map: collections::HashMap<OsString, u64>,
-    pub xattr: collections::HashMap<OsString, String>, 
+    pub xattr: collections::HashMap<OsString, String>,
     pub path: path::PathBuf,
 }
 
@@ -349,6 +348,7 @@ fn remove_nested_children() {
     assert!(h.is_empty());
 }
 
+#[cfg(test)]
 fn build_dummy_node() -> NodeData {
     NodeData {
         content: Vec::new(),

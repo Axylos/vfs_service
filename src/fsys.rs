@@ -1,17 +1,17 @@
 use crate::file_tree;
 use std::str;
-use crate::wiki;
+//use crate::wiki;
 use fuse::{
     FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty,
-    ReplyEntry, ReplyOpen, ReplyWrite, Request, ReplyXattr
+    ReplyEntry, ReplyOpen, ReplyWrite, ReplyXattr, Request,
 };
-use libc::ENOENT;
+use libc::{ENOENT, ENOTDIR};
 use log;
 use std::ffi::OsStr;
 use std::path;
 use time::Timespec;
 
-const EOF: u64 = 04;
+//const EOF: u64 = 04;
 
 pub struct Fs {
     file_tree: file_tree::FileMap,
@@ -44,11 +44,19 @@ impl Filesystem for Fs {
         let _now = time::now().to_timespec();
         log::error!("create: {}, {:?}, {}, {}", parent, name, mode, flags);
         let id = self.file_tree.touch_file(&parent, name);
-        let file = self.file_tree.get(&id).unwrap().data.file_data;
-        let now = time::now().to_timespec();
-        let ttl = now + time::Duration::hours(2);
-        log::error!("got through create");
-        reply.created(&ttl, &file, id, id, flags);
+        match self.file_tree.get(&id) {
+            Some(f) => {
+                let file = f.data.file_data;
+                let now = time::now().to_timespec();
+                let ttl = now + time::Duration::hours(2);
+                log::error!("got through create");
+                reply.created(&ttl, &file, id, id, flags);
+            }
+            None => {
+                log::error!("not a valid parent");
+                reply.error(ENOTDIR);
+            }
+        }
     }
     fn readdir(
         &mut self,
@@ -74,13 +82,20 @@ impl Filesystem for Fs {
                     reply.add(1, 1, FileType::Directory, &path::Path::new(".."));
                     let mut ctr = 2 + offset as i64;
                     for id in children.range(idx..) {
-                        let f = self.file_tree.get(&id).unwrap();
-                        reply.add(f.id, ctr, f.data.file_data.kind, &f.path);
-                        ctr += 1;
-                        log::error!("{:?}", f);
+                        match self.file_tree.get(&id) {
+                            Some(f) => {
+                                reply.add(f.id, ctr, f.data.file_data.kind, &f.path);
+                                ctr += 1;
+                                log::error!("{:?}", f);
+                            }
+                            None => log::error!(
+                                "dangling child reference: parent={} child={}",
+                                &ino,
+                                &id
+                            ),
+                        }
                     }
                 }
-                reply.ok();
             }
             None => reply.error(ENOENT),
         };
@@ -154,7 +169,7 @@ impl Filesystem for Fs {
         // this is just a stupid way
         // to push a value into a byte slice
         // has to be a better way
-        let mut v = data.to_vec();
+        let v = data.to_vec();
         //disable for now seems to work on os x
         //v.push(EOF);
 
@@ -189,14 +204,7 @@ impl Filesystem for Fs {
         reply.written(w_size)
     }
 
-    fn getxattr(
-        &mut self, 
-        _req: &Request, 
-        ino: u64, 
-        name: &OsStr, 
-        size: u32, 
-        reply: ReplyXattr
-        ) {
+    fn getxattr(&mut self, _req: &Request, ino: u64, name: &OsStr, size: u32, reply: ReplyXattr) {
         log::error!("getxattr: ino={} name={:?} size={}", ino, name, size);
         let f = self.file_tree.get(&ino).unwrap();
         log::error!("found xattr {:?}", f.xattr);
@@ -207,45 +215,40 @@ impl Filesystem for Fs {
 
                 reply.data(&bytes);
             }
-            None => reply.error(61)
-        
+            None => reply.error(61),
         }
-
     }
 
-
-    fn listxattr(
-        &mut self, 
-        _req: &Request, 
-        ino: u64, 
-        size: u32, 
-        reply: ReplyXattr
-        ) {
+    fn listxattr(&mut self, _req: &Request, ino: u64, _size: u32, reply: ReplyXattr) {
         let f = self.file_tree.get(&ino).unwrap();
-        let names: Vec<u8> = f.xattr.keys()
-            .map(|s| s.clone().into_string()
-                 .unwrap()
-                 .into_bytes())
+        let names: Vec<u8> = f
+            .xattr
+            .keys()
+            .map(|s| s.clone().into_string().unwrap().into_bytes())
             .flatten()
             .collect();
 
         reply.data(&names[..]);
-    } 
-
+    }
 
     fn setxattr(
-        &mut self, 
-        _req: &Request, 
-        ino: u64, 
-        name: &OsStr, 
-        value: &[u8], 
-        flags: u32, 
-        position: u32, 
-        reply: ReplyEmpty
-
-        ) {
-
-        log::error!("setxattr: ino={} name={:?} value={:?} flags={} position={}", ino, name, value, flags, position);
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        name: &OsStr,
+        value: &[u8],
+        flags: u32,
+        position: u32,
+        reply: ReplyEmpty,
+    ) {
+        log::error!(
+            "setxattr: ino={} name={:?} value={:?} flags={} position={}",
+            ino,
+            name,
+            value,
+            flags,
+            position
+        );
 
         match self.file_tree.get_mut(&ino) {
             Some(f) => {
@@ -253,15 +256,13 @@ impl Filesystem for Fs {
                     Ok(data) => {
                         log::error!("data: {}", data);
                         f.xattr.insert(name.to_os_string(), data.to_string());
-
                     }
-                    Err(e) => log::error!("err: {:?}", e)
+                    Err(e) => log::error!("err: {:?}", e),
                 }
                 log::error!("{:?}", str::from_utf8(value));
                 reply.ok();
             }
-            None => reply.error(ENOENT)
-
+            None => reply.error(ENOENT),
         }
     }
 

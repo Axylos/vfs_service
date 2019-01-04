@@ -14,8 +14,6 @@ fn main() {
 
     let fs = fsys::Fs::new();
 
-    log::error!("watwatwat");
-
     println!("{}", mnt);
     unsafe {
         let _sys = fuse::spawn_mount(fs, &mnt, &[]).unwrap();
