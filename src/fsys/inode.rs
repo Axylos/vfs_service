@@ -48,10 +48,5 @@ impl Inode {
         self.children.insert(id);
         self.name_map.insert(name, id);
     }
-
-    #[cfg(test)]
-    fn inc(&mut self) {
-        self.data.file_data.ino += 1;
-    }
 }
 

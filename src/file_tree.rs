@@ -1,7 +1,63 @@
 use fuse::{FileAttr, FileType};
 use std::collections;
-use std::ffi::{OsStr};
-use crate::fsys::inode::{Inode, NodeData};
+use std::ffi::OsStr;
+use std::ffi::OsString;
+use std::path;
+use time::Timespec;
+
+#[derive(Debug)]
+pub struct NodeData {
+    pub file_data: FileAttr,
+    pub content: Vec<u8>,
+}
+
+// Inode should have a Box trait
+// member, e.g., file or dir,
+// which can then be read from
+// or just make the inode a trait
+// and all references to inodes become
+// boxed generics
+#[derive(Debug)]
+pub struct Inode {
+    pub id: u64,
+    pub ttl: Timespec,
+    pub data: NodeData,
+    pub children: collections::BTreeSet<u64>,
+    pub name_map: collections::HashMap<OsString, u64>,
+    pub xattr: collections::HashMap<OsString, String>,
+    pub path: path::PathBuf,
+}
+
+impl Inode {
+    pub fn access(&mut self) {
+        let now = time::now().to_timespec();
+        self.data.file_data.atime = now;
+    }
+
+    fn new(id: u64, data: NodeData, name: &OsStr) -> Inode {
+        let ttl = time::now().to_timespec() + time::Duration::hours(10);
+        let path = path::PathBuf::from(name);
+        Inode {
+            id,
+            path,
+            data,
+            ttl,
+            xattr: collections::HashMap::new(),
+            children: collections::BTreeSet::new(),
+            name_map: collections::HashMap::new(),
+        }
+    }
+
+    fn add(&mut self, id: u64, name: std::ffi::OsString) {
+        self.children.insert(id);
+        self.name_map.insert(name, id);
+    }
+
+    #[cfg(test)]
+    fn inc(&mut self) {
+        self.data.file_data.ino += 1;
+    }
+}
 
 pub struct FileMap {
     data: collections::HashMap<u64, Inode>,

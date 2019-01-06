@@ -12,7 +12,7 @@ fn main() {
         None => "./test_dir".to_string(),
     };
 
-    let fs = fsys::Fs::new();
+    let fs = fsys::fuse_system::Fs::new();
 
     println!("{}", mnt);
     unsafe {
