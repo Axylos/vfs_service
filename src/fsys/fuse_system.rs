@@ -3,13 +3,14 @@ use std::str;
 //use crate::wiki;
 use fuse::{
     FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty,
-    ReplyEntry, ReplyOpen, ReplyWrite, ReplyXattr, Request,
+    ReplyEntry, ReplyOpen, ReplyWrite, ReplyXattr, Request, ReplyLock
 };
 use libc::{ENOENT, ENOTDIR};
 use log;
 use std::ffi::OsStr;
 use std::path;
 use time::Timespec;
+use std::path::Path;
 
 //const EOF: u64 = 04;
 
@@ -58,15 +59,31 @@ impl Filesystem for Fs {
             }
         }
     }
+
+    fn getlk(
+        &mut self, 
+        _req: &Request, 
+        _ino: u64, 
+        _fh: u64, 
+        _lock_owner: u64, 
+        _start: u64, 
+        _end: u64, 
+        _typ: u32, 
+        _pid: u32, 
+        _reply: ReplyLock
+    ) {
+        log::error!("link called");
+    }
+
     fn readdir(
         &mut self,
-        _req: &Request,
+        req: &Request,
         ino: u64,
         fh: u64,
         offset: i64,
         mut reply: ReplyDirectory,
     ) {
-        log::error!("readdir: {}, {}, {}", ino, fh, offset);
+        log::error!("readdir: {:?}, {}, {}, {}", req, ino, fh, offset);
         match self.file_tree.get(&ino) {
             Some(node) => {
                 let children = &node.children;
@@ -118,13 +135,25 @@ impl Filesystem for Fs {
         }
     }
 
-    /*
+    fn fsyncdir(
+        &mut self, 
+        _req: &Request, 
+        _ino: u64, 
+        _fh: u64, 
+        _datasync: bool, 
+        reply: ReplyEmpty
+
+    ) {
+        log::error!("fsyncdir");
+        reply.ok();
+    }
     fn opendir(&mut self, _req: &Request, ino: u64, flags: u32, reply: ReplyOpen) {
         log::error!("opendir: {}, {}", ino, flags);
+        reply.opened(ino, flags);
     }
-    */
-    fn access(&mut self, _req: &Request, ino: u64, mask: u32, reply: ReplyEmpty) {
-        log::error!("access: {} {}", ino, mask);
+
+    fn access(&mut self, req: &Request, ino: u64, mask: u32, reply: ReplyEmpty) {
+        log::error!("access: {} {} {:?}", ino, mask, req);
         match self.file_tree.access_file(&ino) {
             Ok(()) => {
                 reply.ok();
@@ -155,6 +184,22 @@ impl Filesystem for Fs {
     fn open(&mut self, _req: &Request, ino: u64, flags: u32, reply: ReplyOpen) {
         log::error!("open: {}, {}", ino, flags);
         reply.opened(ino, flags);
+    }
+
+    fn symlink(
+        &mut self, 
+        _req: &Request, 
+        _parent: u64, 
+        _name: &OsStr, 
+        _link: &Path, 
+        _reply: ReplyEntry
+
+    ) {
+        log::error!("symlink");
+    }
+
+    fn readlink(&mut self, _req: &Request, _ino: u64, _reply: ReplyData) {
+        log::error!("symlink");
     }
 
     fn flush(&mut self, _req: &Request, ino: u64, fh: u64, lock_owner: u64, reply: ReplyEmpty) {
@@ -227,6 +272,7 @@ impl Filesystem for Fs {
     }
 
     fn listxattr(&mut self, _req: &Request, ino: u64, _size: u32, reply: ReplyXattr) {
+        log::error!("listxattr called");
         let data = self.file_tree.get_xattr_list(&ino);
         reply.data(&data[..]);
     }

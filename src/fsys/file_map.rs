@@ -205,7 +205,7 @@ fn build_dummy_file() -> FileAttr {
         ino,
         kind: FileType::Directory,
         nlink: 0,
-        perm: 0o755,
+        perm: 0o777,
         rdev: 0,
         size: 0,
         atime: ts,
@@ -215,7 +215,7 @@ fn build_dummy_file() -> FileAttr {
         blocks: 100,
         flags: 0,
         gid: 0,
-        uid: 0,
+        uid: 501,
     }
 }
 #[cfg(test)]
