@@ -1,3 +1,4 @@
+/*
 use crate::fsys::file_map;
 use std::str;
 //use crate::wiki;
@@ -14,6 +15,7 @@ use std::path::Path;
 
 //const EOF: u64 = 04;
 
+mod Old {
 pub struct Fs {
     file_tree: file_map::FileMap,
 }
@@ -369,3 +371,5 @@ impl Filesystem for Fs {
         reply.ok();
     }
 }
+}
+*/

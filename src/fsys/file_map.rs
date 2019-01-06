@@ -1,7 +1,8 @@
+/*
 use fuse::{FileAttr, FileType};
 use std::collections;
 use std::ffi::{OsStr};
-use crate::fsys::inode::{Inode, NodeData};
+//use crate::fsys::inode::{Inode, NodeData, NodeFileData};
 
 pub struct FileMap {
     data: collections::HashMap<u64, Inode>,
@@ -11,11 +12,18 @@ pub struct FileMap {
 impl FileMap {
     pub fn clear_file(&mut self, ino: &u64) {
         self.data.entry(*ino).and_modify(|f| {
-            f.data.file_data.size = 0;
-            f.data.content = [].to_vec();
+            f.file_data.size = 0;
+            /*
+            match f.data {
+                NodeData::File(f) => f.clear(),
+                _ => panic!("omg")
+            }
+            */
+            
         });
     }
 
+    /*
     pub fn write(&mut self, ino: u64, data: &[u8], flags: u32, offset: i64) -> u32 {
         let str = String::from_utf8_lossy(data).trim().to_string();
 
@@ -48,7 +56,9 @@ impl FileMap {
         let size = size as u32;
         size
     }
+    */
 
+    /*
     pub fn get_xattr_list(&self, ino: &u64) -> Vec<u8> {
         let f = self.get(&ino).unwrap();
         let names: Vec<u8> = f
@@ -65,7 +75,7 @@ impl FileMap {
 
         names
     }
-    pub fn getxattr<'a>(&self, ino: &'a u64, name: &OsStr) -> Option<Vec<u8>> {
+    pub fn getxattr<'b>(&self, ino: &'b u64, name: &OsStr) -> Option<Vec<u8>> {
         let f = self.get(&ino)?;
         log::error!("found xattr {:?}", f.xattr);
         let attr = f.xattr.get(name)?;
@@ -90,7 +100,7 @@ impl FileMap {
         self.ino_ctr += 1;
         let mut node = Inode::new(id, data, name);
         node.id = id;
-        node.data.file_data.ino = id;
+        node.file_data.ino = id;
         self.data.insert(id, node);
         let path = name.to_os_string();
         self.data.entry(*parent_id).and_modify(|parent| {
@@ -103,7 +113,10 @@ impl FileMap {
 
     fn resolve_path(&self, parent: &u64, name: &OsStr) -> Option<&u64> {
         let parent = self.get(parent).unwrap();
-        parent.name_map.get(name)
+        match parent.data {
+            NodeData::Dir(f) => f.get_names().get(name)
+        }
+        
     }
 
     pub fn lookup_path(&mut self, parent: &u64, name: &OsStr) -> Option<&Inode> {
@@ -122,10 +135,8 @@ impl FileMap {
     pub fn touch_file(&mut self, parent: &u64, name: &OsStr) -> u64 {
         let mut file = build_dummy_file();
         file.kind = FileType::RegularFile;
-        let node = NodeData {
-            content: Vec::new(),
-            file_data: file,
-        };
+        let val = Box::new(NodeFileData { content: vec![] });
+        let node = NodeData::File(val); 
         self.add_child(parent, node, name)
     }
 
@@ -134,22 +145,26 @@ impl FileMap {
         self.data.len() == 0
     }
 
+    */
     pub fn new() -> FileMap {
         let mut f = FileMap {
             data: collections::HashMap::new(),
             ino_ctr: 2,
         };
 
-        let data = NodeData {
-            content: Vec::new(),
-            file_data: build_dummy_file(),
-        };
+        let mut file = build_dummy_file();
+        file.kind = FileType::RegularFile;
+        let val = Box::new(NodeFileData { content: vec![] });
+        let data = NodeData::File(val); 
+
+
         let name = OsStr::new("root");
         let node = Inode::new(1, data, &name);
         f.data.insert(1, node);
 
         f
     }
+    /*
 
     #[cfg(test)]
     pub fn add(&mut self, data: NodeData) -> u64 {
@@ -190,6 +205,7 @@ impl FileMap {
     pub fn has(&mut self, id: &u64) -> bool {
         self.data.contains_key(id)
     }
+    */
 }
 
 impl PartialEq for Inode {
@@ -348,3 +364,4 @@ fn remove_nested_safely() {
     assert_eq!(h.data.len(), 3);
     assert!(h.has(&root_child_id));
 }
+*/
