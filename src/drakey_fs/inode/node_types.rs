@@ -1,29 +1,25 @@
-use std::collections;
 use crate::drakey_fs::inode;
+use std::collections;
 use std::ffi;
 
-pub trait DrakeyFile {
-
-}
+pub trait DrakeyFile {}
 
 pub trait DrakeyDir {
-    fn get_children(&self) -> &collections::BTreeSet<u64>; 
+    fn get_children(&self) -> &collections::BTreeSet<u64>;
     fn lookup_path(&self, path: &ffi::OsStr) -> Option<&u64>;
     fn add_child(&mut self, child: &u64, path: &ffi::OsStr) -> Option<()>;
 }
 
-impl DrakeyFile for FileNode {
-
-}
+impl DrakeyFile for FileNode {}
 
 impl std::fmt::Debug for DrakeyFile + Send {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "here is a thing")
     }
 }
 
 impl std::fmt::Debug for DrakeyDir + Send {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "here is a thing")
     }
 }
@@ -46,28 +42,26 @@ impl DrakeyDir for DirNode {
 
 #[derive(Debug)]
 pub struct FileNode {
-    content: Vec<u8>
+    content: Vec<u8>,
 }
 
 impl FileNode {
     pub fn new() -> FileNode {
-        FileNode {
-            content: vec![]
-        }
+        FileNode { content: vec![] }
     }
 }
 
 #[derive(Debug)]
 pub struct DirNode {
     pub children: collections::BTreeSet<u64>,
-    pub name_map: collections::HashMap<ffi::OsString, u64>
+    pub name_map: collections::HashMap<ffi::OsString, u64>,
 }
 
 impl DirNode {
     pub fn new() -> DirNode {
         DirNode {
             children: collections::BTreeSet::<u64>::new(),
-            name_map: collections::HashMap::<ffi::OsString, u64>::new()
+            name_map: collections::HashMap::<ffi::OsString, u64>::new(),
         }
     }
 

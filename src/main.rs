@@ -7,7 +7,6 @@ mod fsys;
 
 mod wiki;
 fn main() {
-    
     logger::init();
     let mnt = match env::args().nth(1) {
         Some(path) => path,

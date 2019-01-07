@@ -42,7 +42,7 @@ impl std::fmt::Debug for NodeFile + Send {
         write!(f, "here is a thing")
     }
 }
-    
+
 impl std::fmt::Debug for NodeDir + Send {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result{
         write!(f, "here is a thing")
@@ -51,7 +51,7 @@ impl std::fmt::Debug for NodeDir + Send {
 
 impl NodeFile for NodeFileData {
     fn get_content(&self) -> Vec<u8> {
-       self.content 
+       self.content
     }
 
     fn clear(&mut self) {
@@ -125,4 +125,3 @@ impl Inode {
     }
 }
     */
-

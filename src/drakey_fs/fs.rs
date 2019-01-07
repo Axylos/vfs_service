@@ -1,8 +1,10 @@
 use super::file_tree;
+use fuse::{
+    Filesystem, ReplyAttr, ReplyCreate, ReplyDirectory, ReplyEmpty, ReplyEntry, ReplyOpen, Request,
+};
+use libc::ENOENT;
 use log;
-use libc::{ENOENT};
 use std::{ffi, path};
-use fuse::{ Filesystem, Request, ReplyEntry, ReplyAttr, ReplyCreate, ReplyEmpty, ReplyDirectory, ReplyOpen };
 
 pub struct Fs {
     file_tree: file_tree::FileTree,
@@ -10,42 +12,39 @@ pub struct Fs {
 
 impl Fs {
     pub fn new() -> Fs {
-        Fs { 
-            file_tree: file_tree::FileTree::new()
+        Fs {
+            file_tree: file_tree::FileTree::new(),
         }
     }
 }
 
 impl Filesystem for Fs {
     fn mkdir(
-        &mut self, 
-        _req: &Request, 
-        parent: u64, 
-        name: &ffi::OsStr, 
-        mode: u32, 
-        reply: ReplyEntry
+        &mut self,
+        _req: &Request,
+        parent: u64,
+        name: &ffi::OsStr,
+        mode: u32,
+        reply: ReplyEntry,
     ) {
         log::error!("make dir parent={} name={:?} mode={}", parent, name, mode);
         match self.file_tree.add_dir(&parent, name) {
             Ok(f) => {
                 log::error!("everything ok, {:?} {:?} {}", &f.ttl, &f.file_data, f.id);
-reply.entry(&f.ttl, &f.file_data, f.id)
-            },
+                reply.entry(&f.ttl, &f.file_data, f.id)
+            }
             Err(i) => {
-
                 log::error!("wat");
-            reply.error(i)
-}
+                reply.error(i)
+            }
         }
     }
 
     fn getattr(&mut self, _req: &Request, ino: u64, reply: ReplyAttr) {
         log::error!("getattr thingy: {}", ino);
         match self.file_tree.get_file_attrs(&ino) {
-            Some((ttl, attr)) => {
-                reply.attr(ttl, attr)
-            },
-            None => reply.error(ENOENT)
+            Some((ttl, attr)) => reply.attr(ttl, attr),
+            None => reply.error(ENOENT),
         }
     }
 
@@ -60,14 +59,13 @@ reply.entry(&f.ttl, &f.file_data, f.id)
                 // the generation final arg needs to be the id.
                 // seems similar to fh wtf
                 reply.entry(&file.ttl, &file.file_data, file.id);
-            },
+            }
             None => {
                 log::error!("no file found in lookup");
                 reply.error(ENOENT);
             }
         }
     }
-
 
     fn opendir(&mut self, _req: &Request, ino: u64, flags: u32, reply: ReplyOpen) {
         log::error!("opendir: {}, {}", ino, flags);
@@ -116,18 +114,18 @@ reply.entry(&f.ttl, &f.file_data, f.id)
 
         match self.file_tree.lookup(&ino) {
             Some(file) => reply.attr(&now, &file.file_data),
-            None => reply.error(ENOENT)
+            None => reply.error(ENOENT),
         }
     }
 
     fn readdir(
-        &mut self, 
-        _req: &Request, 
-        ino: u64, 
-        fh: u64, 
-        offset: i64, 
-        mut reply: ReplyDirectory
-        ) {
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        offset: i64,
+        mut reply: ReplyDirectory,
+    ) {
         log::error!("readdir: {}, {}, {}", ino, fh, offset);
         match self.file_tree.read_dir(&ino) {
             Some(children) => {
@@ -154,7 +152,7 @@ reply.entry(&f.ttl, &f.file_data, f.id)
                                 "dangling child reference: parent={} child={}",
                                 &ino,
                                 &id
-                                ),
+                            ),
                         }
                     }
                 }
@@ -165,7 +163,6 @@ reply.entry(&f.ttl, &f.file_data, f.id)
                 reply.error(ENOENT);
             }
         };
-
     }
 
     fn access(&mut self, req: &Request, ino: u64, mask: u32, reply: ReplyEmpty) {
@@ -173,24 +170,24 @@ reply.entry(&f.ttl, &f.file_data, f.id)
         match self.file_tree.access_file(&ino) {
             Ok(()) => {
                 reply.ok();
-            },
-            Err(_) => reply.error(ENOENT)
+            }
+            Err(_) => reply.error(ENOENT),
         }
     }
 
     fn create(
-        &mut self, 
-        _req: &Request, 
-        parent: u64, 
-        name: &ffi::OsStr, 
-        _mode: u32, 
-        flags: u32, 
-        reply: ReplyCreate)
-        {
-            log::error!("touching file: {} {:?}", parent, name);
-            match self.file_tree.add_file(&parent, name) {
-                Ok(f) => reply.created(&f.ttl, &f.file_data, f.id, f.id, flags),
-                Err(i) => reply.error(i)
-            }
-    } 
+        &mut self,
+        _req: &Request,
+        parent: u64,
+        name: &ffi::OsStr,
+        _mode: u32,
+        flags: u32,
+        reply: ReplyCreate,
+    ) {
+        log::error!("touching file: {} {:?}", parent, name);
+        match self.file_tree.add_file(&parent, name) {
+            Ok(f) => reply.created(&f.ttl, &f.file_data, f.id, f.id, flags),
+            Err(i) => reply.error(i),
+        }
+    }
 }

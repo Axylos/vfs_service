@@ -1,11 +1,11 @@
 pub mod node_data;
 pub mod node_types;
-use std::collections;
-use std::path;
-use time;
-use std::ffi;
 use fuse::{FileAttr, FileType};
 use libc;
+use std::collections;
+use std::ffi;
+use std::path;
+use time;
 
 #[derive(Debug)]
 pub struct Inode {
@@ -38,7 +38,6 @@ impl Inode {
             uid: 501,
         };
 
-
         let ttl = time::now().to_timespec() + time::Duration::hours(10);
         let path = path::PathBuf::from(name);
         let file = node_types::FileNode::new();
@@ -52,7 +51,6 @@ impl Inode {
             ttl,
             xattr: collections::HashMap::new(),
         }
-
     }
     pub fn new_dir(id: &u64, name: &ffi::OsStr) -> Inode {
         let ts = time::now().to_timespec();
@@ -90,8 +88,6 @@ impl Inode {
     }
 
     pub fn access(&mut self) -> Option<()> {
-
-
         Some(())
     }
 }

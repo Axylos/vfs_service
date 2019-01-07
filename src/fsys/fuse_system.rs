@@ -63,15 +63,15 @@ impl Filesystem for Fs {
     }
 
     fn getlk(
-        &mut self, 
-        _req: &Request, 
-        _ino: u64, 
-        _fh: u64, 
-        _lock_owner: u64, 
-        _start: u64, 
-        _end: u64, 
-        _typ: u32, 
-        _pid: u32, 
+        &mut self,
+        _req: &Request,
+        _ino: u64,
+        _fh: u64,
+        _lock_owner: u64,
+        _start: u64,
+        _end: u64,
+        _typ: u32,
+        _pid: u32,
         _reply: ReplyLock
     ) {
         log::error!("link called");
@@ -138,11 +138,11 @@ impl Filesystem for Fs {
     }
 
     fn fsyncdir(
-        &mut self, 
-        _req: &Request, 
-        _ino: u64, 
-        _fh: u64, 
-        _datasync: bool, 
+        &mut self,
+        _req: &Request,
+        _ino: u64,
+        _fh: u64,
+        _datasync: bool,
         reply: ReplyEmpty
 
     ) {
@@ -189,11 +189,11 @@ impl Filesystem for Fs {
     }
 
     fn symlink(
-        &mut self, 
-        _req: &Request, 
-        _parent: u64, 
-        _name: &OsStr, 
-        _link: &Path, 
+        &mut self,
+        _req: &Request,
+        _parent: u64,
+        _name: &OsStr,
+        _link: &Path,
         _reply: ReplyEntry
 
     ) {

@@ -1,20 +1,20 @@
+use super::inode;
 use std::collections;
 use std::ffi;
-use super::inode;
 mod dir_ops;
 mod file_ops;
 
 #[derive(Debug)]
 pub struct FileTree {
     files: collections::HashMap<u64, inode::Inode>,
-    ino_ctr: u64
+    ino_ctr: u64,
 }
 
 impl FileTree {
     pub fn new() -> FileTree {
         let mut tree = FileTree {
             files: collections::HashMap::<u64, inode::Inode>::new(),
-            ino_ctr: 2 // init at 2 to ignore root
+            ino_ctr: 2, // init at 2 to ignore root
         };
 
         let name = ffi::OsStr::new("root");
