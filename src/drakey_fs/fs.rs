@@ -187,6 +187,7 @@ reply.entry(&f.ttl, &f.file_data, f.id)
         flags: u32, 
         reply: ReplyCreate)
         {
+            log::error!("touching file: {} {:?}", parent, name);
             match self.file_tree.add_file(&parent, name) {
                 Ok(f) => reply.created(&f.ttl, &f.file_data, f.id, f.id, flags),
                 Err(i) => reply.error(i)

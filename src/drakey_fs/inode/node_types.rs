@@ -2,6 +2,48 @@ use std::collections;
 use crate::drakey_fs::inode;
 use std::ffi;
 
+pub trait DrakeyFile {
+
+}
+
+pub trait DrakeyDir {
+    fn get_children(&self) -> &collections::BTreeSet<u64>; 
+    fn lookup_path(&self, path: &ffi::OsStr) -> Option<&u64>;
+    fn add_child(&mut self, child: &u64, path: &ffi::OsStr) -> Option<()>;
+}
+
+impl DrakeyFile for FileNode {
+
+}
+
+impl std::fmt::Debug for DrakeyFile + Send {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result{
+        write!(f, "here is a thing")
+    }
+}
+
+impl std::fmt::Debug for DrakeyDir + Send {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result{
+        write!(f, "here is a thing")
+    }
+}
+
+impl DrakeyDir for DirNode {
+    fn get_children(&self) -> &collections::BTreeSet<u64> {
+        &self.children
+    }
+
+    fn lookup_path(&self, path: &ffi::OsStr) -> Option<&u64> {
+        self.name_map.get(path)
+    }
+
+    fn add_child(&mut self, child: &u64, path: &ffi::OsStr) -> Option<()> {
+        self.children.insert(*child);
+        self.name_map.insert(path.to_os_string(), *child);
+        Some(())
+    }
+}
+
 #[derive(Debug)]
 pub struct FileNode {
     content: Vec<u8>
@@ -33,11 +75,4 @@ impl DirNode {
         println!("lookup child called");
         self.name_map.get(path)
     }
-
-    pub fn add_child(&mut self, ino: &u64, path: &ffi::OsStr) -> Option<()> {
-        self.children.insert(*ino);
-        self.name_map.insert(path.to_os_string(), *ino);
-        Some(())
-    }
-
 }
