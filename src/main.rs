@@ -14,7 +14,7 @@ fn main() {
         None => "./test_dir".to_string(),
     };
 
-    let fs = drakey_fs::Fs::new();
+    let fs = drakey_fs::fs::Fs::new();
     println!("{}", mnt);
 
     unsafe {
