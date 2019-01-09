@@ -1,6 +1,7 @@
 use super::file_tree;
 use fuse::{
-    Filesystem, ReplyAttr, ReplyCreate, ReplyDirectory, ReplyEmpty, ReplyEntry, ReplyOpen, Request,
+    Filesystem, ReplyAttr, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty, ReplyEntry,
+    ReplyOpen, ReplyWrite, Request,
 };
 use libc::ENOENT;
 use log;
@@ -41,7 +42,7 @@ impl Filesystem for Fs {
     }
 
     fn getattr(&mut self, _req: &Request, ino: u64, reply: ReplyAttr) {
-        log::error!("getattr thingy: {}", ino);
+        log::error!("getattr: {}", ino);
         match self.file_tree.get_file_attrs(&ino) {
             Some((ttl, attr)) => reply.attr(ttl, attr),
             None => reply.error(ENOENT),
@@ -65,6 +66,32 @@ impl Filesystem for Fs {
                 reply.error(ENOENT);
             }
         }
+    }
+
+    fn open(&mut self, _req: &Request, ino: u64, flags: u32, reply: ReplyOpen) {
+        log::error!("open: ino={} flags={}", ino, flags);
+        reply.opened(ino, flags);
+    }
+
+    fn write(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        offset: i64,
+        data: &[u8],
+        flags: u32,
+        reply: ReplyWrite,
+    ) {
+        log::error!("write: {} {} {} {:?} {}", ino, fh, offset, data, flags);
+        let w_size = std::mem::size_of_val(data) as u32;
+        log::error!("write size: {}", w_size as u32);
+        let size = self.file_tree.write_file(ino, data, flags, offset);
+        log::error!("size={:?}", size);
+        // must return exact same size as data that was requested to be written
+        // or else stupid io invalid arg error or something happens
+        // really stupid
+        reply.written(w_size)
     }
 
     fn opendir(&mut self, _req: &Request, ino: u64, flags: u32, reply: ReplyOpen) {
@@ -118,6 +145,33 @@ impl Filesystem for Fs {
         }
     }
 
+    fn read(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        offset: i64,
+        size: u32,
+        reply: ReplyData,
+    ) {
+        log::error!("read: {}, {}, {}, size={}", ino, fh, offset, size);
+        match self.file_tree.get_file(&ino) {
+            Some(f) => {
+                let data = &f.get_content();
+                // this is just a stupid way
+                // to push a value into a byte slice
+                // has to be a better way
+                let v = data.to_vec();
+                //disable for now seems to work on os x
+                //v.push(EOF);
+
+                let o = offset as usize;
+                let d: &[u8] = &v[o..];
+                reply.data(d)
+            }
+            None => reply.error(ENOENT),
+        }
+    }
     fn readdir(
         &mut self,
         _req: &Request,

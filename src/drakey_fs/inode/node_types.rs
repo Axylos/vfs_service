@@ -1,8 +1,10 @@
-use crate::drakey_fs::inode;
 use std::collections;
 use std::ffi;
 
-pub trait DrakeyFile {}
+pub trait DrakeyFile {
+    fn write(&mut self, buf: &[u8]) -> u32;
+    fn get_content(&self) -> &[u8];
+}
 
 pub trait DrakeyDir {
     fn get_children(&self) -> &collections::BTreeSet<u64>;
@@ -10,7 +12,16 @@ pub trait DrakeyDir {
     fn add_child(&mut self, child: &u64, path: &ffi::OsStr) -> Option<()>;
 }
 
-impl DrakeyFile for FileNode {}
+impl DrakeyFile for FileNode {
+    fn write(&mut self, buf: &[u8]) -> u32 {
+        self.content = buf.to_vec();
+        std::mem::size_of_val(buf) as u32
+    }
+
+    fn get_content(&self) -> &[u8] {
+        &self.content[..]
+    }
+}
 
 impl std::fmt::Debug for DrakeyFile + Send {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -65,7 +76,7 @@ impl DirNode {
         }
     }
 
-    pub fn lookup_child(&self, path: &ffi::OsStr) -> Option<&u64> {
+    pub fn _lookup_child(&self, path: &ffi::OsStr) -> Option<&u64> {
         println!("lookup child called");
         self.name_map.get(path)
     }

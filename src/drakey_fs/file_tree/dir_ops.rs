@@ -2,7 +2,6 @@ use super::FileTree;
 use crate::drakey_fs::inode;
 use crate::drakey_fs::inode::{node_data::NodeData, node_types};
 use libc::ENOENT;
-use std::boxed;
 use std::collections;
 use std::ffi;
 
@@ -77,7 +76,7 @@ impl FileTree {
         self.files.get(ino)
     }
 
-    fn resolve_path(&mut self, parent: &u64, path: &ffi::OsStr) -> Option<&u64> {
+    fn _resolve_path(&mut self, parent: &u64, path: &ffi::OsStr) -> Option<&u64> {
         let node = self.files.get_mut(parent)?;
         match &mut node.data {
             NodeData::Dir(dir) => dir.lookup_path(path),
@@ -85,7 +84,7 @@ impl FileTree {
         }
     }
 
-    fn get_dir(&self, ino: &u64) -> Option<&boxed::Box<node_types::DrakeyDir + Send>> {
+    fn get_dir(&self, ino: &u64) -> Option<&Box<node_types::DrakeyDir + Send>> {
         let node = self.lookup(ino)?;
         match &node.data {
             NodeData::Dir(dir) => Some(dir),
