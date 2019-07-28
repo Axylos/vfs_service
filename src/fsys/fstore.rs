@@ -28,6 +28,10 @@ impl FileStore {
         f
     }
 
+    pub fn rename(&mut self, parent: &u64, name: &OsStr, newparent: u64, newname: &OsStr) {
+
+    }
+
     pub fn write(&mut self, ino: u64, data: &[u8], flags: u32, offset: i64) -> u32 {
         let str = String::from_utf8_lossy(data).trim().to_string();
 
@@ -66,6 +70,48 @@ impl FileStore {
 
         let size = size as u32;
         size
+    }
+
+    pub fn unlink(&mut self, parent: &u64, name: &OsStr) {
+        let ino = self.resolve_path(parent, name).unwrap();
+        log::error!("about to unlink: {}", ino);
+        let i = ino.clone();
+        self.remove(&i);
+
+        self.file_table.entry(*parent).and_modify(|f| {
+            match &mut f.data {
+                NodeData::Dir(dir) => {
+                    dir.name_map.remove(&name.to_os_string());
+                    dir.children.remove(&i);
+                }
+                _ => log::error!("can't rm file {:?}", parent)
+            }
+        });
+        log::error!("{:?}", self.file_table);
+    }
+
+    pub fn create_dir(&mut self, parent: u64, name: &OsStr, mode: u32) -> Option<&Inode> {
+        let mut dir = DirNode::new();
+        let node = NodeData::Dir(dir);
+        let id = self.add_child(&parent, node, name);
+
+        self.get(&id)
+    }
+
+    pub fn remove(&mut self, id: &u64) {
+        let node = self.file_table.get(id).unwrap();
+        match &node.data {
+            NodeData::Dir(dir) => {
+                let y = dir.children.clone();
+                for child in y.iter() {
+                    self.remove(child);
+                }
+                self.file_table.remove(id);
+            }
+            _ => log::error!("no children")
+        }
+
+        self.file_table.remove(id);
     }
 
     pub fn get(&self, id: &u64) -> Option<&Inode> {
