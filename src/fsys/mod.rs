@@ -1,3 +1,2 @@
-mod file_map;
-mod inode;
+mod fstore;
 pub mod fuse_system;

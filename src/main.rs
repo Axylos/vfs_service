@@ -1,8 +1,7 @@
 use std::{env, io};
 mod logger;
-use log;
 
-mod fsys;
+mod fsys2;
 
 mod wiki;
 fn main() {
