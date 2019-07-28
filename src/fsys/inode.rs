@@ -4,6 +4,8 @@ use std::ffi::{OsStr, OsString};
 use fuse::{FileAttr, FileType};
 use time::Timespec;
 
+const USER_DIR: u32 = 0755;
+
 #[derive(Debug)]
 pub struct FileNode {
     pub content: Vec<u8>,
@@ -42,7 +44,7 @@ pub struct Inode {
 
 impl Inode {
     pub fn new(id: u64, data: NodeData, name: &OsStr, uid: u32, gid: u32) -> Inode {
-        let ttl = time::now().to_timespec() + time::Duration::hours(24);
+        let ttl = time::Timespec::new(1, 0);
         let path = path::PathBuf::from(name);
         let mut attr = build_dummy_file();
         attr.uid = uid;

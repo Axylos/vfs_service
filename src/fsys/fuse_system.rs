@@ -6,6 +6,7 @@ use fuse::{
     ReplyCreate,
     ReplyData, ReplyDirectory, ReplyEmpty,
     ReplyEntry, ReplyOpen, ReplyWrite, ReplyXattr,
+    ReplyLock,
     Request,
 };
 
@@ -51,6 +52,22 @@ impl Filesystem for Fs {
         mut reply: ReplyDirectory,
     ) {
         log::error!("readdir: {}, {}, {}", ino, fh, offset);
+        reply.ok();
+    }
+
+    fn getlk(
+        &mut self, 
+        _req: &Request, 
+        _ino: u64, 
+        _fh: u64, 
+        _lock_owner: u64, 
+        _start: u64, 
+        _end: u64, 
+        _typ: u32, 
+        _pid: u32, 
+        _reply: ReplyLock
+        ) {
+        log::error!("getlk!");
     }
 
     fn setattr(
