@@ -14,11 +14,9 @@ fn main() {
     let fs = fsys::fuse_system::Fs::new();
 
     println!("{}", mnt);
-    unsafe {
-        let _sys = fuse::spawn_mount(fs, &mnt, &[]).unwrap();
+        let _sys = fuse::mount(fs, &mnt, &[]).unwrap();
         let mut str = String::new();
 
         io::stdin().read_line(&mut str).expect("invalid input");
-    }
     println!("all done!");
 }

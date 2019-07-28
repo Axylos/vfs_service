@@ -1,6 +1,8 @@
 use std::ffi::{OsStr};
+use std::time::{SystemTime, Duration};
 use fuse::{
     FileType,
+    FileAttr,
     Filesystem,
     ReplyAttr,
     ReplyCreate,
@@ -10,10 +12,13 @@ use fuse::{
     Request,
 };
 
+use std::path;
+
 use crate::fsys::fstore::{FileStore};
+use crate::fsys::inode::{NodeData, DirNode, FileNode};
 use time::Timespec;
 
-use libc::{ENOENT};
+use libc::{ENOENT, ENOTDIR};
 
 pub struct Fs {
     store: FileStore
@@ -41,6 +46,94 @@ impl Filesystem for Fs {
 
     fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
         log::error!("called lookup");
+        match self.store.lookup_path(&parent, name) {
+            Some(file) => {
+                log::error!("found file: {:?}", file);
+                let _data = &file.data;
+
+                // the generation final arg needs to be the id.
+                // seems similar to fh wtf
+                reply.entry(&file.ttl, &file.attr, file.id);
+            }
+            None => {
+                log::error!("no file found in lookup");
+                reply.error(ENOENT);
+            }
+        }
+
+    }
+    fn create(
+        &mut self,
+        _req: &Request,
+        parent: u64,
+        name: &OsStr,
+        mode: u32,
+        flags: u32,
+        reply: ReplyCreate,
+    ) {
+        let _now = time::now().to_timespec();
+        log::error!("create: {}, {:?}, {}, {}", parent, name, mode, flags);
+        let id = self.store.touch_file(&parent, name);
+        match self.store.get(&id) {
+            Some(f) => {
+                let file = f.attr;
+                let now = SystemTime::now();
+                let ttl = Duration::from_secs(1);
+                log::error!("got through create");
+                reply.created(&ttl, &file, id, id, flags);
+            }
+            None => {
+                log::error!("not a valid parent");
+                reply.error(ENOTDIR);
+            }
+        }
+    }
+
+
+    fn read(&mut self, _req: &Request, ino: u64, _fh: u64, offset: i64, _size: u32, reply: ReplyData) {
+        println!("read");
+        match self.store.get(&ino) {
+            Some(f) => {
+                match &f.data {
+                    NodeData::File(file) => {
+                        let data = &file.content;
+                        // this is just a stupid way
+                        // to push a value into a byte slice
+                        // has to be a better way
+                        let v = data.to_vec();
+                        //disable for now seems to work on os x
+                        //v.push(EOF);
+
+                        let o = offset as usize;
+                        let d: &[u8] = &v[o..];
+                        reply.data(d)
+                    }
+                    _ => reply.error(ENOENT)
+                }
+            },
+            None => reply.error(ENOENT)
+        }
+    }
+
+    fn write(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        fh: u64,
+        offset: i64,
+        data: &[u8],
+        flags: u32,
+        reply: ReplyWrite,
+    ) {
+        log::error!("write: {} {} {} {:?} {}", ino, fh, offset, data, flags);
+        let w_size = std::mem::size_of_val(data) as u32;
+        log::error!("write size: {}", w_size as u32);
+        let size = self.store.write(ino, data, flags, offset);
+        log::error!("size={}", size);
+        // must return exact same size as data that was requested to be written
+        // or else stupid io invalid arg error or something happens
+        // really stupid
+        reply.written(w_size)
     }
 
     fn readdir(
@@ -50,9 +143,59 @@ impl Filesystem for Fs {
         fh: u64,
         offset: i64,
         mut reply: ReplyDirectory,
-    ) {
+        ) {
         log::error!("readdir: {}, {}, {}", ino, fh, offset);
-        reply.ok();
+        match self.store.get(&ino) {
+            Some(inode) => {
+                match &inode.data {
+                    NodeData::Dir(node) => {
+                    log::error!("called");
+                        let children = &node.children;
+                        let mut idx: u64 = 0;
+                        let offset = offset as u64;
+                        if offset > 2 {
+                            idx = offset - 2;
+                        }
+
+                        let len = children.len() as u64;
+                        println!("called");
+                        if offset < len + 1 as u64 {
+                            reply.add(1, 0, FileType::Directory, &path::Path::new("."));
+                            reply.add(1, 1, FileType::Directory, &path::Path::new(".."));
+                            let mut ctr = 2 + offset as i64;
+                            for id in children.range(idx..) {
+                                match self.store.get(&id) {
+                                    Some(f) => {
+                                        reply.add(f.id, ctr, f.attr.kind, &f.path);
+                                        ctr += 1;
+                                        log::error!("{:?}", f);
+                                    }
+                                    None => log::error!(
+                                        "dangling child reference: parent={} child={}",
+                                        &ino,
+                                        &id
+                                        ),
+                                }
+                            }
+                        }
+                        reply.ok();
+
+                    }
+                    NodeData::File(node) => {
+                        log::error!("file found:");
+                        reply.error(ENOENT);
+                    }
+                    _ => {
+
+                    log::error!("this got called");
+reply.error(ENOENT)
+                    }
+                }
+            }
+            None => {
+                reply.error(ENOENT);
+            }
+        }
     }
 
     fn getlk(
@@ -78,12 +221,12 @@ impl Filesystem for Fs {
         gid: Option<u32>,
         uid: Option<u32>,
         size: Option<u64>,
-        atime: Option<Timespec>,
-        mtime: Option<Timespec>,
+        atime: Option<SystemTime>,
+        mtime: Option<SystemTime>,
         fh: Option<u64>,
-        crtime: Option<Timespec>,
-        chgtime: Option<Timespec>,
-        bkuptime: Option<Timespec>,
+        crtime: Option<SystemTime>,
+        chgtime: Option<SystemTime>,
+        bkuptime: Option<SystemTime>,
         flags: Option<u32>,
         reply: ReplyAttr,
     ) {
@@ -105,6 +248,13 @@ impl Filesystem for Fs {
             bkuptime,
             flags
             );
+        let now = Duration::from_secs(1);
+        if let Some(_) = size {
+            self.store.clear_file(&ino);
+        }
+        let file = self.store.get(&ino).unwrap();
+        reply.attr(&now, &file.attr);
+
     }
 
     fn flush(&mut self, _req: &Request, ino: u64, fh: u64, lock_owner: u64, reply: ReplyEmpty) {
@@ -128,16 +278,35 @@ impl Filesystem for Fs {
         reply.ok();
     }
 
+    /*
     fn opendir(&mut self, _req: &Request, ino: u64, flags: u32, reply: ReplyOpen) {
         log::error!("opendir: {}, {}", ino, flags);
     }
+    */
 
     fn getattr(&mut self, _req: &Request, ino: u64, reply: ReplyAttr) {
-        log::error!("get attr {:?} {:?}", _req, ino);
         match self.store.get(&ino) {
             Some(file) => {
-                log::debug!("found filez: {:?} {:?}", file.attr, file.ttl);
-                reply.attr(&file.ttl, &file.attr);
+                let ts = std::time::UNIX_EPOCH;
+                let ttl = Duration::from_secs(1);
+                let attr = FileAttr {
+                    ino: 1,
+                    size: 0,
+                    blocks: 0,
+                    mtime: ts,
+                    atime: ts,
+                    ctime: ts,
+                    crtime: ts,
+                    kind: FileType::Directory,
+                    perm: 0o755,
+                    nlink: 2,
+                    uid: 501,
+                    gid: 20,
+                    rdev: 0,
+                    flags: 0
+                };
+                log::debug!("found filez: {:?} {:?}", file.attr, ttl);
+                reply.attr(&ttl, &file.attr);
             }
             None => {
                 log::error!("none found!");

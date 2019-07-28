@@ -2,9 +2,9 @@ use std::collections;
 use std::path;
 use std::ffi::{OsStr, OsString};
 use fuse::{FileAttr, FileType};
-use time::Timespec;
+use std::time::{Duration, UNIX_EPOCH, SystemTime};
 
-const USER_DIR: u32 = 0755;
+const USER_DIR: u32 = 0x755;
 
 #[derive(Debug)]
 pub struct FileNode {
@@ -25,6 +25,22 @@ pub struct DirNode {
     pub name_map: collections::HashMap<OsString, u64>,
 }
 
+impl DirNode {
+    pub fn new() -> DirNode {
+        DirNode {
+            children: collections::BTreeSet::new(),
+            name_map: collections::HashMap::new(),
+
+        }
+    }
+
+    pub fn add(&mut self, id: u64, name: std::ffi::OsString) {
+        self.children.insert(id);
+        self.name_map.insert(name, id);
+    }
+
+}
+
 #[derive(Debug)]
 pub enum NodeData {
     File(FileNode),
@@ -35,7 +51,7 @@ pub enum NodeData {
 #[derive(Debug)]
 pub struct Inode {
     pub id: u64,
-    pub ttl: Timespec,
+    pub ttl: std::time::Duration,
     pub data: NodeData,
     pub attr: FileAttr,
     pub xattr: collections::HashMap<OsString, String>,
@@ -44,11 +60,15 @@ pub struct Inode {
 
 impl Inode {
     pub fn new(id: u64, data: NodeData, name: &OsStr, uid: u32, gid: u32) -> Inode {
-        let ttl = time::Timespec::new(1, 0);
+        let ttl = Duration::from_secs(1);
         let path = path::PathBuf::from(name);
-        let mut attr = build_dummy_file();
-        attr.uid = uid;
-        attr.gid = gid;
+        let kind = match data {
+            NodeData::File(_) => FileType::RegularFile,
+            NodeData::Dir(_) => FileType::Directory
+        };
+        let mut attr = build_dummy_file(kind);
+        attr.uid = 501;
+        attr.gid = 20;
         Inode {
             id,
             attr,
@@ -59,23 +79,30 @@ impl Inode {
         }
 
     }
+
+
+    pub fn access(&mut self) {
+        let now = SystemTime::now();
+        self.attr.atime = now;
+    }
+
 }
 
-fn build_dummy_file() -> FileAttr {
-    let ts = time::now().to_timespec();
+fn build_dummy_file(kind: FileType) -> FileAttr {
+    let ts = std::time::UNIX_EPOCH;
     let ino = 1;
     FileAttr {
         ino,
-        kind: FileType::Directory,
-        nlink: 0,
-        perm: 0755,
+        kind,
+        nlink: 2,
+        perm: 0o755,
         rdev: 0,
         size: 0,
         atime: ts,
         ctime: ts,
         crtime: ts,
         mtime: ts,
-        blocks: 100,
+        blocks: 0,
         flags: 0,
         gid: 0,
         uid: 0,
