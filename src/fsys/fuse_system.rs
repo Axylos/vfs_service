@@ -2,21 +2,18 @@ use std::ffi::{OsStr};
 use std::time::{SystemTime, Duration};
 use fuse::{
     FileType,
-    FileAttr,
     Filesystem,
     ReplyAttr,
     ReplyCreate,
     ReplyData, ReplyDirectory, ReplyEmpty,
-    ReplyEntry, ReplyOpen, ReplyWrite, ReplyXattr,
-    ReplyLock,
+    ReplyEntry, ReplyOpen, ReplyWrite,
     Request,
 };
 
 use std::path;
 
 use crate::fsys::fstore::{FileStore};
-use crate::fsys::inode::{NodeData, DirNode, FileNode};
-use time::Timespec;
+use crate::fsys::inode::{NodeData};
 
 use libc::{ENOENT, ENOTDIR};
 
@@ -56,7 +53,7 @@ impl Filesystem for Fs {
                 reply.entry(&file.ttl, &file.attr, file.id);
             }
             None => {
-                log::error!("no file found in lookup");
+                log::error!("no file found in lookup: {:?} {:?}", name, parent);
                 reply.error(ENOENT);
             }
         }
@@ -103,7 +100,9 @@ impl Filesystem for Fs {
         let node = self.store.create_dir(parent, name, mode);
         let ttl = Duration::from_secs(1);
         match node {
-            Some(dir) => reply.entry(&ttl, &dir.attr, dir.id),
+            Some(dir) => {
+                reply.entry(&ttl, &dir.attr, dir.id);
+            }
             _ => reply.error(ENOENT)
         }
     }
@@ -123,7 +122,6 @@ impl Filesystem for Fs {
         match self.store.get(&id) {
             Some(f) => {
                 let file = f.attr;
-                let now = SystemTime::now();
                 let ttl = Duration::from_secs(1);
                 log::error!("got through create");
                 reply.created(&ttl, &file, id, id, flags);
@@ -136,7 +134,7 @@ impl Filesystem for Fs {
     }
 
 
-    fn read(&mut self, _req: &Request, ino: u64, _fh: u64, offset: i64, _size: u32, reply: ReplyData) {
+    fn read(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, _size: u32, reply: ReplyData) {
         println!("read");
         match self.store.get(&ino) {
             Some(f) => {
@@ -157,7 +155,10 @@ impl Filesystem for Fs {
                     _ => reply.error(ENOENT)
                 }
             },
-            None => reply.error(ENOENT)
+            None => {
+                log::error!("read failed {:?} {:?}", ino, fh);
+reply.error(ENOENT)
+            }
         }
     }
 
@@ -186,16 +187,15 @@ impl Filesystem for Fs {
         &mut self,
         _req: &Request,
         ino: u64,
-        fh: u64,
+        _fh: u64,
         offset: i64,
         mut reply: ReplyDirectory,
         ) {
-        log::error!("readdir: {}, {}, {}", ino, fh, offset);
+        //log::error!("readdir: {}, {}, {}", ino, fh, offset);
         match self.store.get(&ino) {
             Some(inode) => {
                 match &inode.data {
-                    NodeData::Dir(node) => {
-                    log::error!("called");
+                    NodeData::RegularDir(node) => {
                         let children = &node.children;
                         let mut idx: u64 = 0;
                         let offset = offset as u64;
@@ -227,14 +227,40 @@ impl Filesystem for Fs {
                         reply.ok();
 
                     }
-                    NodeData::File(node) => {
+                    NodeData::ServiceDir(node) => {
+                        let children = &node.children;
+                        let mut idx: u64 = 0;
+                        let offset = offset as u64;
+                        if offset > 2 {
+                            idx = offset - 2;
+                        }
+
+                        let len = children.len() as u64;
+                        println!("called");
+                        if offset < len + 1 as u64 {
+                            reply.add(1, 0, FileType::Directory, &path::Path::new("."));
+                            reply.add(1, 1, FileType::Directory, &path::Path::new(".."));
+                            let mut ctr = 2 + offset as i64;
+                            for id in children.range(idx..) {
+                                match self.store.get(&id) {
+                                    Some(f) => {
+                                        reply.add(f.id, ctr, f.attr.kind, &f.path);
+                                        ctr += 1;
+                                        log::error!("{:?}", f);
+                                    }
+                                    None => log::error!(
+                                        "dangling child reference: parent={} child={}",
+                                        &ino,
+                                        &id
+                                        ),
+                                }
+                            }
+                        }
+                        reply.ok();
+                    }
+                    NodeData::File(_node) => {
                         log::error!("file found:");
                         reply.error(ENOENT);
-                    }
-                    _ => {
-
-                    log::error!("this got called");
-reply.error(ENOENT)
                     }
                 }
             }
@@ -244,6 +270,7 @@ reply.error(ENOENT)
         }
     }
 
+    /*
     fn getlk(
         &mut self, 
         _req: &Request, 
@@ -258,6 +285,7 @@ reply.error(ENOENT)
         ) {
         log::error!("getlk!");
     }
+    */
 
     fn setattr(
         &mut self,
@@ -329,33 +357,20 @@ reply.error(ENOENT)
         log::error!("opendir: {}, {}", ino, flags);
     }
     */
+    fn open(&mut self, _req: &Request, ino: u64, flags: u32, reply: ReplyOpen) {
+        log::error!("open called {:?} {:?}", ino, flags);
+        reply.opened(ino, flags);
+    }
 
     fn getattr(&mut self, _req: &Request, ino: u64, reply: ReplyAttr) {
         match self.store.get(&ino) {
             Some(file) => {
-                let ts = std::time::UNIX_EPOCH;
                 let ttl = Duration::from_secs(1);
-                let attr = FileAttr {
-                    ino: 1,
-                    size: 0,
-                    blocks: 0,
-                    mtime: ts,
-                    atime: ts,
-                    ctime: ts,
-                    crtime: ts,
-                    kind: FileType::Directory,
-                    perm: 0o755,
-                    nlink: 2,
-                    uid: 501,
-                    gid: 20,
-                    rdev: 0,
-                    flags: 0
-                };
                 log::debug!("found filez: {:?} {:?}", file.attr, ttl);
                 reply.attr(&ttl, &file.attr);
             }
             None => {
-                log::error!("none found!");
+                log::error!("none found! {:?}", ino, );
                 reply.error(ENOENT);
             }
         }

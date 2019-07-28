@@ -1,8 +1,8 @@
-use std::collections;
-use std::ffi::{OsStr};
-use crate::fsys::inode::{Inode, NodeData, FileNode, DirNode};
-use fuse::{FileType};
+use std::{path, collections};
+use std::ffi::{OsStr, OsString};
+use crate::fsys::inode::{Inode, NodeData, FileNode, RegularDirNode, DirNode};
 use std::time::{SystemTime};
+use crate::sw_svc::build_sw_service;
 
 const UID: u32 = 1000;
 const GID: u32 = 1000;
@@ -19,18 +19,50 @@ impl FileStore {
         };
 
 
-        let data = DirNode::new(); 
-        let node_data = NodeData::Dir(data);
+        let data = RegularDirNode::new(); 
+        let node_data = NodeData::RegularDir(data);
         let name = OsStr::new("root");
         let node = Inode::new(fuse::FUSE_ROOT_ID, node_data, &name, UID, GID);
 
         f.file_table.insert(1, node);
+
+        let svc = build_sw_service();
+        let one = 1;
+        let svc_node = NodeData::ServiceDir(svc);
+        f.add_child(&one, svc_node, OsStr::new("sw_svc"));
+
         f
     }
 
-    pub fn rename(&mut self, parent: &u64, name: &OsStr, newparent: u64, newname: &OsStr) {
-
+    pub fn _add_node(&mut self, _parent: &u64, node: &Inode, path: OsString) {
+        self.file_table.entry(node.id).and_modify(|parent| {
+            match &mut parent.data {
+                NodeData::RegularDir(dir) => {
+                    dir.add(node.id, path);
+                }
+                _ => ()
+            }
+        });
     }
+
+    pub fn rename(&mut self, parent: &u64, name: &OsStr, newparent: u64, newname: &OsStr) {
+        log::error!("{:?} {:?} {:?} {:?}", parent, name, newparent, newname);
+        let id = self.remove_child(parent, name);
+
+        self.file_table.entry(id).and_modify(|node| {
+            node.path = path::Path::new(newname).to_path_buf();
+        });
+
+        let path = newname.to_os_string();
+        self.file_table.entry(newparent).and_modify(|par| {
+            match &mut par.data {
+                NodeData::RegularDir(dir) => {
+                    dir.add(id, path);
+                }
+                _ => log::error!("oopsie")
+            }
+        });
+}
 
     pub fn write(&mut self, ino: u64, data: &[u8], flags: u32, offset: i64) -> u32 {
         let str = String::from_utf8_lossy(data).trim().to_string();
@@ -72,36 +104,56 @@ impl FileStore {
         size
     }
 
-    pub fn unlink(&mut self, parent: &u64, name: &OsStr) {
+    pub fn remove_child(&mut self, parent: &u64, name: &OsStr) -> u64 {
         let ino = self.resolve_path(parent, name).unwrap();
         log::error!("about to unlink: {}", ino);
-        let i = ino.clone();
-        self.remove(&i);
+        let id = ino.clone();
 
         self.file_table.entry(*parent).and_modify(|f| {
             match &mut f.data {
-                NodeData::Dir(dir) => {
-                    dir.name_map.remove(&name.to_os_string());
-                    dir.children.remove(&i);
-                }
+                NodeData::RegularDir(dir) => dir.remove(&id, name),
                 _ => log::error!("can't rm file {:?}", parent)
             }
         });
+
+        id
+    }
+
+    pub fn unlink(&mut self, parent: &u64, name: &OsStr) {
+        let i = self.remove_child(parent, name);
+        self.remove(&i);
         log::error!("{:?}", self.file_table);
     }
 
-    pub fn create_dir(&mut self, parent: u64, name: &OsStr, mode: u32) -> Option<&Inode> {
-        let mut dir = DirNode::new();
-        let node = NodeData::Dir(dir);
-        let id = self.add_child(&parent, node, name);
+    pub fn create_dir(&mut self, parent: u64, name: &OsStr, _mode: u32) -> Option<&Inode> {
+        let id = self.resolve_path(&parent, name)?;
+        let parent_dir = self.file_table.get(&id)?;
 
-        self.get(&id)
+        match &parent_dir.data {
+            NodeData::RegularDir(p) => {
+                let dir = RegularDirNode::new();
+                let node = NodeData::RegularDir(dir);
+
+                let id = self.add_child(&parent, node, name);
+                self.get(&id)
+            }
+            _ => None
+        }
+
+        /*
+         * insanity for testing multiple store ops
+        let mut dir2 = DirNode::new();
+        let node2 = NodeData::Dir(dir2);
+        let id2 = self.touch_file(&id, &OsStr::new("newname"));
+        let id3 = self.touch_file(&id, &OsStr::new("newname2"));
+        */
+
     }
 
     pub fn remove(&mut self, id: &u64) {
         let node = self.file_table.get(id).unwrap();
         match &node.data {
-            NodeData::Dir(dir) => {
+            NodeData::RegularDir(dir) => {
                 let y = dir.children.clone();
                 for child in y.iter() {
                     self.remove(child);
@@ -119,39 +171,62 @@ impl FileStore {
     }
 
     pub fn lookup_path(&mut self, parent: &u64, name: &OsStr) -> Option<&Inode> {
-        // double the work so the result of an
-        // immutable borrow is not used for a mutable borrow
         let id = self.resolve_path(parent, name)?;
 
-        self.file_table.entry(*id).and_modify(|file| {
+        self.file_table.entry(id).and_modify(|file| {
             file.access();
         });
 
-        let id = self.resolve_path(parent, name).unwrap();
         self.get(&id)
     }
 
-    pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {
-        let id: u64 = (self.ino_ctr) as u64;
-        self.ino_ctr += 1;
-        // replace with uid and gid from req
-        let mut node = Inode::new(id, data, name, 1000, 1000);
-        node.id = id;
-        node.attr.ino = id;
-        self.file_table.insert(id, node);
-        let path = name.to_os_string();
-        self.file_table.entry(*parent_id).and_modify(|parent| {
-            match &mut parent.data {
-                NodeData::Dir(dir) => {
-                    dir.add(id, path);
+pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {
+    let id: u64 = (self.ino_ctr) as u64;
+    self.ino_ctr += 1;
+    // replace with uid and gid from req
+    let mut node = Inode::new(id, data, name, 1000, 1000);
+    node.id = id;
+    node.attr.ino = id;
+    match &self.file_table.get(parent_id).unwrap().data {
+        NodeData::RegularDir(_) => {
+            self.file_table.insert(id, node);
+        }
+        NodeData::ServiceDir(dir) => {
+            let data = dir.service.fetch_data(name.to_str());
+            let d: &[u8] = &data.join("\n").into_bytes();
+            let s = d.len();
+            node.attr.size = s as u64;
+            match &mut node.data {
+                NodeData::File(f) => {
+                    println!("{:?}", data);
+                    f.content = data.join("\n").into_bytes();
                 }
-                _ => ()
+                _ => {
+                    log::error!("oops");
+                }
             }
-        });
-        log::error!("new entry: {:?}", self.file_table);
 
-        id
+
+            self.file_table.insert(id, node);
+        }
+        _ => log::error!("not a dir")
     }
+
+    // consider extracting to method
+    // see rename above
+    let path = name.to_os_string();
+    self.file_table.entry(*parent_id).and_modify(|parent| {
+        match &mut parent.data {
+            NodeData::RegularDir(dir) => {
+                dir.add(id, path);
+            }
+            _ => ()
+        }
+    });
+    log::error!("new entry: {:?}", self.file_table);
+
+    id
+}
 
     pub fn clear_file(&mut self, ino: &u64) {
         self.file_table.entry(*ino).and_modify(|f| {
@@ -167,16 +242,16 @@ impl FileStore {
 
 
     pub fn touch_file(&mut self, parent: &u64, name: &OsStr) -> u64 {
-        let mut file = FileNode::new();
+        let file = FileNode::new();
         let node = NodeData::File(file);
         self.add_child(parent, node, name)
     }
 
-    fn resolve_path(&self, parent: &u64, name: &OsStr) -> Option<&u64> {
+    fn resolve_path(&self, parent: &u64, name: &OsStr) -> Option<u64> {
         let parent = self.get(parent).unwrap();
         match &parent.data {
-            NodeData::Dir(dir) => {
-                dir.name_map.get(name)
+            NodeData::RegularDir(dir) => {
+                Some(dir.name_map.get(name)?.clone())
             }
             _ => None
         }

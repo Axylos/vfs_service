@@ -2,11 +2,10 @@ use std::collections;
 use std::path;
 use std::ffi::{OsStr, OsString};
 use fuse::{FileAttr, FileType};
-use std::time::{Duration, UNIX_EPOCH, SystemTime};
+use std::time::{Duration, SystemTime};
+use std::fmt;
 
-const USER_DIR: u32 = 0x755;
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FileNode {
     pub content: Vec<u8>,
 }
@@ -19,37 +18,125 @@ impl FileNode {
     }
 }
 
-#[derive(Debug)]
-pub struct DirNode {
+#[derive(Debug, Clone)]
+pub struct RegularDirNode {
     pub children: collections::BTreeSet<u64>,
     pub name_map: collections::HashMap<OsString, u64>,
 }
 
-impl DirNode {
-    pub fn new() -> DirNode {
-        DirNode {
+#[derive(Debug, Clone)]
+pub struct BundleServiceDirNode {
+    pub children: collections::BTreeSet<u64>,
+    pub name_map: collections::HashMap<OsString, u64>,
+}
+
+pub trait SingleService {
+    fn fetch_data(&self, query: Option<&str>) -> Vec<String>;
+}
+
+#[derive(Debug)]
+pub struct Service {
+    pub svc: Box<dyn SingleService>,
+}
+
+impl Service {
+    pub fn new(svc: Box<dyn SingleService>) -> Service {
+        Service {
+            svc
+        }
+    }
+}
+
+impl std::fmt::Debug for SingleService + 'static {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "it worked")
+    }
+
+}
+
+#[derive(Debug)]
+pub struct ServiceDirNode {
+    pub children: collections::BTreeSet<u64>,
+    pub name_map: collections::HashMap<OsString, u64>,
+    pub service: Box<dyn SingleService>
+}
+
+impl ServiceDirNode {
+    pub fn new(service: Box<dyn SingleService>) -> ServiceDirNode {
+        ServiceDirNode {
+            children: collections::BTreeSet::new(),
+            name_map: collections::HashMap::new(),
+            service,
+        }
+    }
+
+    fn get_data(&self, query: Option<&str>) -> Vec<String> {
+        self.service.fetch_data(query)
+    }
+
+    fn remove(&mut self, id: &u64, name: &OsStr) {
+        self.children.remove(id);
+        self.name_map.remove(name);
+    }
+
+    fn add(&mut self, id: u64, name: std::ffi::OsString) {
+        self.children.insert(id);
+        self.name_map.insert(name, id);
+    }
+}
+
+
+pub struct NumSvc {
+    pub data: u64
+}
+
+impl SingleService for NumSvc {
+    fn fetch_data(&self, query: Option<&str>) -> Vec<String> { 
+        match query {
+            Some(q) => {
+                let len = q.len() as u64;
+                vec!("foo".to_string())
+            }
+            None => vec!("foo".to_string())
+        }
+    }
+}
+
+
+impl RegularDirNode {
+    pub fn new() -> RegularDirNode {
+        RegularDirNode {
             children: collections::BTreeSet::new(),
             name_map: collections::HashMap::new(),
 
         }
     }
+}
 
-    pub fn remove(&mut self, id: &u64, name: &OsString) {
+
+impl DirNode for RegularDirNode {
+    fn remove(&mut self, id: &u64, name: &OsStr) {
         self.children.remove(id);
         self.name_map.remove(name);
     }
 
-    pub fn add(&mut self, id: u64, name: std::ffi::OsString) {
+    fn add(&mut self, id: u64, name: std::ffi::OsString) {
         self.children.insert(id);
         self.name_map.insert(name, id);
     }
 
 }
 
+pub trait DirNode {
+    fn remove(&mut self, id: &u64, name: &OsStr);
+    fn add(&mut self, id: u64, name: std::ffi::OsString);
+}
+
 #[derive(Debug)]
 pub enum NodeData {
     File(FileNode),
-    Dir(DirNode),
+    RegularDir(RegularDirNode),
+    ServiceDir(ServiceDirNode)
 }
 
 
@@ -64,12 +151,13 @@ pub struct Inode {
 }
 
 impl Inode {
-    pub fn new(id: u64, data: NodeData, name: &OsStr, uid: u32, gid: u32) -> Inode {
+    pub fn new(id: u64, data: NodeData, name: &OsStr, _uid: u32, _gid: u32) -> Inode {
         let ttl = Duration::from_secs(1);
         let path = path::PathBuf::from(name);
         let kind = match data {
             NodeData::File(_) => FileType::RegularFile,
-            NodeData::Dir(_) => FileType::Directory
+            NodeData::RegularDir(_) => FileType::Directory,
+            NodeData::ServiceDir(_) => FileType::Directory,
         };
         let mut attr = build_dummy_file(kind);
         attr.uid = 501;

@@ -1,11 +1,14 @@
 use std::{env, io};
 mod logger;
-
+mod sw_svc;
 mod fsys;
 
 mod wiki;
 fn main() {
     logger::init();
+    let str = wiki::query();
+    println!("{:?}", str);
+
     let mnt = match env::args().nth(1) {
         Some(path) => path,
         None => "./test_dir".to_string(),

@@ -1,5 +1,4 @@
-/*
-use serde_json::Error;
+use serde_json::{Value, Error};
 use std::process::Command;
 
 pub fn query() -> Result<String, Error> {
@@ -9,6 +8,7 @@ pub fn query() -> Result<String, Error> {
         .expect("wat");
 
     let data = String::from_utf8_lossy(&resp.stdout);
-    serde_json::from_str(&data)
+    let val: Value = serde_json::from_str(&data)?;
+    println!("{:?}", val);
+    Ok("wat".to_string())
 }
-*/
