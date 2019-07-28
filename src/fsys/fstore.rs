@@ -1,5 +1,5 @@
-use std::collections;
-use std::ffi::{OsStr};
+use std::{path, collections};
+use std::ffi::{OsStr, OsString};
 use crate::fsys::inode::{Inode, NodeData, FileNode, DirNode};
 use fuse::{FileType};
 use std::time::{SystemTime};
@@ -28,9 +28,35 @@ impl FileStore {
         f
     }
 
-    pub fn rename(&mut self, parent: &u64, name: &OsStr, newparent: u64, newname: &OsStr) {
-
+    pub fn add_node(&mut self, parent: &u64, node: &Inode, path: OsString) {
+        self.file_table.entry(node.id).and_modify(|parent| {
+            match &mut parent.data {
+                NodeData::Dir(dir) => {
+                    dir.add(node.id, path);
+                }
+                _ => ()
+            }
+        });
     }
+
+    pub fn rename(&mut self, parent: &u64, name: &OsStr, newparent: u64, newname: &OsStr) {
+        log::error!("{:?} {:?} {:?} {:?}", parent, name, newparent, newname);
+        let id = self.remove_child(parent, name);
+
+        self.file_table.entry(id).and_modify(|node| {
+            node.path = path::Path::new(newname).to_path_buf();
+        });
+
+        let path = newname.to_os_string();
+        self.file_table.entry(newparent).and_modify(|par| {
+            match &mut par.data {
+                NodeData::Dir(dir) => {
+                    dir.add(id, path);
+                }
+                _ => log::error!("oopsie")
+            }
+        });
+}
 
     pub fn write(&mut self, ino: u64, data: &[u8], flags: u32, offset: i64) -> u32 {
         let str = String::from_utf8_lossy(data).trim().to_string();
@@ -72,11 +98,10 @@ impl FileStore {
         size
     }
 
-    pub fn unlink(&mut self, parent: &u64, name: &OsStr) {
+    pub fn remove_child(&mut self, parent: &u64, name: &OsStr) -> u64 {
         let ino = self.resolve_path(parent, name).unwrap();
         log::error!("about to unlink: {}", ino);
         let i = ino.clone();
-        self.remove(&i);
 
         self.file_table.entry(*parent).and_modify(|f| {
             match &mut f.data {
@@ -87,6 +112,13 @@ impl FileStore {
                 _ => log::error!("can't rm file {:?}", parent)
             }
         });
+
+        i
+    }
+
+    pub fn unlink(&mut self, parent: &u64, name: &OsStr) {
+        let i = self.remove_child(parent, name);
+        self.remove(&i);
         log::error!("{:?}", self.file_table);
     }
 
@@ -139,6 +171,8 @@ impl FileStore {
         node.id = id;
         node.attr.ino = id;
         self.file_table.insert(id, node);
+        // consider extracting to method
+        // see rename above
         let path = name.to_os_string();
         self.file_table.entry(*parent_id).and_modify(|parent| {
             match &mut parent.data {

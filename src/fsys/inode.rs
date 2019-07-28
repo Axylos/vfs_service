@@ -6,7 +6,7 @@ use std::time::{Duration, UNIX_EPOCH, SystemTime};
 
 const USER_DIR: u32 = 0x755;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FileNode {
     pub content: Vec<u8>,
 }
@@ -19,7 +19,7 @@ impl FileNode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DirNode {
     pub children: collections::BTreeSet<u64>,
     pub name_map: collections::HashMap<OsString, u64>,
@@ -46,14 +46,14 @@ impl DirNode {
 
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NodeData {
     File(FileNode),
     Dir(DirNode),
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Inode {
     pub id: u64,
     pub ttl: std::time::Duration,

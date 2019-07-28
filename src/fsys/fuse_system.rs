@@ -56,7 +56,7 @@ impl Filesystem for Fs {
                 reply.entry(&file.ttl, &file.attr, file.id);
             }
             None => {
-                log::error!("no file found in lookup");
+                log::error!("no file found in lookup: {:?} {:?}", name, parent);
                 reply.error(ENOENT);
             }
         }
@@ -136,7 +136,7 @@ impl Filesystem for Fs {
     }
 
 
-    fn read(&mut self, _req: &Request, ino: u64, _fh: u64, offset: i64, _size: u32, reply: ReplyData) {
+    fn read(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, _size: u32, reply: ReplyData) {
         println!("read");
         match self.store.get(&ino) {
             Some(f) => {
@@ -157,7 +157,10 @@ impl Filesystem for Fs {
                     _ => reply.error(ENOENT)
                 }
             },
-            None => reply.error(ENOENT)
+            None => {
+                log::error!("read failed {:?} {:?}", ino, fh);
+reply.error(ENOENT)
+            }
         }
     }
 
@@ -190,7 +193,7 @@ impl Filesystem for Fs {
         offset: i64,
         mut reply: ReplyDirectory,
         ) {
-        log::error!("readdir: {}, {}, {}", ino, fh, offset);
+        //log::error!("readdir: {}, {}, {}", ino, fh, offset);
         match self.store.get(&ino) {
             Some(inode) => {
                 match &inode.data {
@@ -244,6 +247,7 @@ reply.error(ENOENT)
         }
     }
 
+    /*
     fn getlk(
         &mut self, 
         _req: &Request, 
@@ -258,6 +262,7 @@ reply.error(ENOENT)
         ) {
         log::error!("getlk!");
     }
+    */
 
     fn setattr(
         &mut self,
@@ -329,6 +334,10 @@ reply.error(ENOENT)
         log::error!("opendir: {}, {}", ino, flags);
     }
     */
+    fn open(&mut self, _req: &Request, ino: u64, flags: u32, reply: ReplyOpen) {
+        log::error!("open called {:?} {:?}", ino, flags);
+        reply.opened(ino, flags);
+    }
 
     fn getattr(&mut self, _req: &Request, ino: u64, reply: ReplyAttr) {
         match self.store.get(&ino) {
@@ -355,7 +364,7 @@ reply.error(ENOENT)
                 reply.attr(&ttl, &file.attr);
             }
             None => {
-                log::error!("none found!");
+                log::error!("none found! {:?}", ino, );
                 reply.error(ENOENT);
             }
         }
