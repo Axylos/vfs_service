@@ -62,6 +62,52 @@ impl Filesystem for Fs {
         }
 
     }
+
+    fn rmdir(
+        &mut self, 
+        _req: &Request, 
+        parent: u64, 
+        name: &OsStr, 
+        reply: ReplyEmpty
+
+        ) {
+        log::error!("unlink {} {:?}", parent, name);
+        self.store.unlink(&parent, name);
+        reply.ok();
+    }
+
+    fn rename(
+        &mut self, 
+        _req: &Request, 
+        parent: u64, 
+        name: &OsStr, 
+        newparent: u64, 
+        newname: &OsStr, 
+        reply: ReplyEmpty
+        ) {
+        self.store.rename(&parent, name, newparent, newname);
+        reply.ok();
+    }
+
+
+    fn mkdir(
+        &mut self, 
+        _req: &Request, 
+        parent: u64, 
+        name: &OsStr, 
+        mode: u32, 
+        reply: ReplyEntry
+        ) {
+        log::debug!("creating a dir");
+
+        let node = self.store.create_dir(parent, name, mode);
+        let ttl = Duration::from_secs(1);
+        match node {
+            Some(dir) => reply.entry(&ttl, &dir.attr, dir.id),
+            _ => reply.error(ENOENT)
+        }
+    }
+
     fn create(
         &mut self,
         _req: &Request,
@@ -315,4 +361,11 @@ reply.error(ENOENT)
         }
 
     }
+
+    fn unlink(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEmpty) {
+        log::error!("unlink {} {:?}", parent, name);
+        self.store.unlink(&parent, name);
+        reply.ok();
+    }
+
 }

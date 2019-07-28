@@ -34,6 +34,11 @@ impl DirNode {
         }
     }
 
+    pub fn remove(&mut self, id: &u64, name: &OsString) {
+        self.children.remove(id);
+        self.name_map.remove(name);
+    }
+
     pub fn add(&mut self, id: u64, name: std::ffi::OsString) {
         self.children.insert(id);
         self.name_map.insert(name, id);
