@@ -3,6 +3,7 @@ use std::collections;
 use std::ffi::{OsStr};
 use crate::fsys::inode::{Inode, NodeData};
 
+use crate::fsys::inode::{Inode};
 pub struct FileMap {
     data: collections::HashMap<u64, Inode>,
     ino_ctr: u64,

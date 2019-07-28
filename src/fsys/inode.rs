@@ -1,52 +1,111 @@
 use std::collections;
 use std::path;
-use time::Timespec;
-use fuse::{FileAttr};
-use std::ffi::OsStr;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
+use fuse::{FileAttr, FileType};
+use std::time::{Duration, UNIX_EPOCH, SystemTime};
 
+const USER_DIR: u32 = 0x755;
 
 #[derive(Debug)]
-pub struct NodeData {
-    pub file_data: FileAttr,
+pub struct FileNode {
     pub content: Vec<u8>,
 }
 
-
-#[derive(Debug)]
-pub struct Inode {
-    pub id: u64,
-    pub ttl: Timespec,
-    pub data: NodeData,
-    pub children: collections::BTreeSet<u64>,
-    pub name_map: collections::HashMap<OsString, u64>,
-    pub xattr: collections::HashMap<OsString, String>,
-    pub path: path::PathBuf,
+impl FileNode {
+    pub fn new() -> FileNode {
+        FileNode {
+            content: Vec::new()
+        }
+    }
 }
 
-impl Inode {
-    pub fn access(&mut self) {
-        let now = time::now().to_timespec();
-        self.data.file_data.atime = now;
-    }
+#[derive(Debug)]
+pub struct DirNode {
+    pub children: collections::BTreeSet<u64>,
+    pub name_map: collections::HashMap<OsString, u64>,
+}
 
-    pub fn new(id: u64, data: NodeData, name: &OsStr) -> Inode {
-        let ttl = time::now().to_timespec() + time::Duration::hours(10);
-        let path = path::PathBuf::from(name);
-        Inode {
-            id,
-            path,
-            data,
-            ttl,
-            xattr: collections::HashMap::new(),
+impl DirNode {
+    pub fn new() -> DirNode {
+        DirNode {
             children: collections::BTreeSet::new(),
             name_map: collections::HashMap::new(),
+
         }
     }
 
     pub fn add(&mut self, id: u64, name: std::ffi::OsString) {
         self.children.insert(id);
         self.name_map.insert(name, id);
+    }
+
+}
+
+#[derive(Debug)]
+pub enum NodeData {
+    File(FileNode),
+    Dir(DirNode),
+}
+
+
+#[derive(Debug)]
+pub struct Inode {
+    pub id: u64,
+    pub ttl: std::time::Duration,
+    pub data: NodeData,
+    pub attr: FileAttr,
+    pub xattr: collections::HashMap<OsString, String>,
+    pub path: path::PathBuf,
+}
+
+impl Inode {
+    pub fn new(id: u64, data: NodeData, name: &OsStr, uid: u32, gid: u32) -> Inode {
+        let ttl = Duration::from_secs(1);
+        let path = path::PathBuf::from(name);
+        let kind = match data {
+            NodeData::File(_) => FileType::RegularFile,
+            NodeData::Dir(_) => FileType::Directory
+        };
+        let mut attr = build_dummy_file(kind);
+        attr.uid = 501;
+        attr.gid = 20;
+        Inode {
+            id,
+            attr,
+            path,
+            data,
+            ttl,
+            xattr: collections::HashMap::new(),
+        }
+
+    }
+
+
+    pub fn access(&mut self) {
+        let now = SystemTime::now();
+        self.attr.atime = now;
+    }
+
+}
+
+fn build_dummy_file(kind: FileType) -> FileAttr {
+    let ts = std::time::UNIX_EPOCH;
+    let ino = 1;
+    FileAttr {
+        ino,
+        kind,
+        nlink: 2,
+        perm: 0o755,
+        rdev: 0,
+        size: 0,
+        atime: ts,
+        ctime: ts,
+        crtime: ts,
+        mtime: ts,
+        blocks: 0,
+        flags: 0,
+        gid: 0,
+        uid: 0,
     }
 }
 
