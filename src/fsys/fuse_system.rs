@@ -195,7 +195,7 @@ reply.error(ENOENT)
         match self.store.get(&ino) {
             Some(inode) => {
                 match &inode.data {
-                    NodeData::Dir(node) => {
+                    NodeData::RegularDir(node) => {
                     log::error!("called");
                         let children = &node.children;
                         let mut idx: u64 = 0;

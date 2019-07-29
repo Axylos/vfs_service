@@ -18,40 +18,103 @@ impl FileNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct DirNode {
+pub struct RegularDirNode {
     pub children: collections::BTreeSet<u64>,
     pub name_map: collections::HashMap<OsString, u64>,
 }
 
-impl DirNode {
-    pub fn new() -> DirNode {
-        DirNode {
+pub struct BundleServiceDirNode {
+    pub children: collections::BTreeSet<u64>,
+    pub name_map: collections::HashMap<OsString, u64>,
+}
+
+pub struct ServiceDirNode {
+    pub children: collections::BTreeSet<u64>,
+    pub name_map: collections::HashMap<OsString, u64>,
+}
+
+pub trait SingleService {
+    fn fetch_data(query: Option<&str>) -> Result<(u64), Box<dyn std::error::Error>>;
+}
+
+pub struct NumSvc {
+    pub data: u64
+}
+
+impl SingleService for NumSvc {
+    fn fetch_data(query: Option<&str>) -> Result<(u64), Box<dyn std::error::Error>> { 
+        match query {
+            Some(q) => {
+                let len = q.len() as u64;
+                Ok(len)
+            }
+            None => Ok(0)
+        }
+    }
+}
+
+impl ServiceDirNode {
+    pub fn new(svc: impl SingleService) -> ServiceDirNode {
+        ServiceDirNode {
+            children: collections::BTreeSet::new(),
+            name_map: collections::HashMap::new(),
+        }
+    }
+
+}
+
+
+impl DirNode for ServiceDirNode {
+    fn remove(&mut self, id: &u64, name: &OsStr) {
+        self.children.remove(id);
+        self.name_map.remove(name);
+    }
+
+    fn add(&mut self, id: u64, name: std::ffi::OsString) {
+        self.children.insert(id);
+        self.name_map.insert(name, id);
+    }
+}
+
+impl RegularDirNode {
+    pub fn new() -> RegularDirNode {
+        RegularDirNode {
             children: collections::BTreeSet::new(),
             name_map: collections::HashMap::new(),
 
         }
     }
 
-    pub fn _remove(&mut self, id: &u64, name: &OsString) {
+    pub fn get_stuff(&self) -> u64 { 4 }
+}
+
+
+impl DirNode for RegularDirNode {
+    fn remove(&mut self, id: &u64, name: &OsStr) {
         self.children.remove(id);
         self.name_map.remove(name);
     }
 
-    pub fn add(&mut self, id: u64, name: std::ffi::OsString) {
+    fn add(&mut self, id: u64, name: std::ffi::OsString) {
         self.children.insert(id);
         self.name_map.insert(name, id);
     }
 
 }
 
-#[derive(Debug, Clone)]
+pub trait DirNode {
+    fn remove(&mut self, id: &u64, name: &OsStr);
+    fn add(&mut self, id: u64, name: std::ffi::OsString);
+}
+
+#[derive(Debug)]
 pub enum NodeData {
     File(FileNode),
-    Dir(DirNode),
+    RegularDir(RegularDirNode),
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Inode {
     pub id: u64,
     pub ttl: std::time::Duration,
@@ -67,7 +130,7 @@ impl Inode {
         let path = path::PathBuf::from(name);
         let kind = match data {
             NodeData::File(_) => FileType::RegularFile,
-            NodeData::Dir(_) => FileType::Directory
+            NodeData::RegularDir(_) => FileType::Directory
         };
         let mut attr = build_dummy_file(kind);
         attr.uid = 501;

@@ -1,6 +1,6 @@
 use std::{path, collections};
 use std::ffi::{OsStr, OsString};
-use crate::fsys::inode::{Inode, NodeData, FileNode, DirNode};
+use crate::fsys::inode::{Inode, NodeData, FileNode, RegularDirNode, DirNode};
 use std::time::{SystemTime};
 
 const UID: u32 = 1000;
@@ -18,8 +18,8 @@ impl FileStore {
         };
 
 
-        let data = DirNode::new(); 
-        let node_data = NodeData::Dir(data);
+        let data = RegularDirNode::new(); 
+        let node_data = NodeData::RegularDir(data);
         let name = OsStr::new("root");
         let node = Inode::new(fuse::FUSE_ROOT_ID, node_data, &name, UID, GID);
 
@@ -30,7 +30,7 @@ impl FileStore {
     pub fn _add_node(&mut self, _parent: &u64, node: &Inode, path: OsString) {
         self.file_table.entry(node.id).and_modify(|parent| {
             match &mut parent.data {
-                NodeData::Dir(dir) => {
+                NodeData::RegularDir(dir) => {
                     dir.add(node.id, path);
                 }
                 _ => ()
@@ -49,7 +49,7 @@ impl FileStore {
         let path = newname.to_os_string();
         self.file_table.entry(newparent).and_modify(|par| {
             match &mut par.data {
-                NodeData::Dir(dir) => {
+                NodeData::RegularDir(dir) => {
                     dir.add(id, path);
                 }
                 _ => log::error!("oopsie")
@@ -100,19 +100,16 @@ impl FileStore {
     pub fn remove_child(&mut self, parent: &u64, name: &OsStr) -> u64 {
         let ino = self.resolve_path(parent, name).unwrap();
         log::error!("about to unlink: {}", ino);
-        let i = ino.clone();
+        let id = ino.clone();
 
         self.file_table.entry(*parent).and_modify(|f| {
             match &mut f.data {
-                NodeData::Dir(dir) => {
-                    dir.name_map.remove(&name.to_os_string());
-                    dir.children.remove(&i);
-                }
+                NodeData::RegularDir(dir) => dir.remove(&id, name),
                 _ => log::error!("can't rm file {:?}", parent)
             }
         });
 
-        i
+        id
     }
 
     pub fn unlink(&mut self, parent: &u64, name: &OsStr) {
@@ -122,9 +119,20 @@ impl FileStore {
     }
 
     pub fn create_dir(&mut self, parent: u64, name: &OsStr, _mode: u32) -> Option<&Inode> {
-        let dir = DirNode::new();
-        let node = NodeData::Dir(dir);
-        let id = self.add_child(&parent, node, name);
+        let id = self.resolve_path(&parent, name)?;
+        let parent_dir = self.file_table.get(&id)?;
+
+        match &parent_dir.data {
+            NodeData::RegularDir(p) => {
+                let dir = RegularDirNode::new();
+                let node = NodeData::RegularDir(dir);
+                let i = p.get_stuff();
+
+                let id = self.add_child(&parent, node, name);
+                self.get(&id)
+            }
+            _ => None
+        }
 
         /*
          * insanity for testing multiple store ops
@@ -134,13 +142,12 @@ impl FileStore {
         let id3 = self.touch_file(&id, &OsStr::new("newname2"));
         */
 
-        self.get(&id)
     }
 
     pub fn remove(&mut self, id: &u64) {
         let node = self.file_table.get(id).unwrap();
         match &node.data {
-            NodeData::Dir(dir) => {
+            NodeData::RegularDir(dir) => {
                 let y = dir.children.clone();
                 for child in y.iter() {
                     self.remove(child);
@@ -180,7 +187,7 @@ impl FileStore {
         let path = name.to_os_string();
         self.file_table.entry(*parent_id).and_modify(|parent| {
             match &mut parent.data {
-                NodeData::Dir(dir) => {
+                NodeData::RegularDir(dir) => {
                     dir.add(id, path);
                 }
                 _ => ()
@@ -213,7 +220,7 @@ impl FileStore {
     fn resolve_path(&self, parent: &u64, name: &OsStr) -> Option<u64> {
         let parent = self.get(parent).unwrap();
         match &parent.data {
-            NodeData::Dir(dir) => {
+            NodeData::RegularDir(dir) => {
                 Some(dir.name_map.get(name)?.clone())
             }
             _ => None

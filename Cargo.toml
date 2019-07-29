@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 fuse = { path = "../rust-fuse" }
+reqwest = "0.9.19"
 time = "*"
 libc = "*"
 log = "*"
