@@ -3,6 +3,7 @@ use std::ffi::{OsStr, OsString};
 use crate::fsys::inode::{Inode, NodeData, FileNode, RegularDirNode, DirNode};
 use std::time::{SystemTime};
 use crate::sw_svc::build_sw_service;
+use crate::weather_svc::build_weather_service;
 
 const UID: u32 = 1000;
 const GID: u32 = 1000;
@@ -27,9 +28,12 @@ impl FileStore {
         f.file_table.insert(1, node);
 
         let svc = build_sw_service();
+        let weather_svc = build_weather_service();
         let one = 1;
         let svc_node = NodeData::ServiceDir(svc);
+        let weather_node = NodeData::ServiceDir(weather_svc);
         f.add_child(&one, svc_node, OsStr::new("sw_svc"));
+        f.add_child(&one, weather_node, OsStr::new("weather_svc"));
 
         f
     }

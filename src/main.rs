@@ -1,6 +1,7 @@
 use std::{env, io};
 mod logger;
 mod sw_svc;
+mod weather_svc;
 mod fsys;
 
 mod wiki;

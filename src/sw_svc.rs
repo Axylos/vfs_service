@@ -1,7 +1,5 @@
 use std::fmt;
-use std::collections::{HashMap, BTreeSet};
 use reqwest;
-use serde_json;
 use serde::Deserialize;
 use crate::fsys::inode::{ServiceDirNode, SingleService};
 
@@ -27,7 +25,7 @@ pub struct StarWarsService {}
 
 impl SingleService for StarWarsService  {
 
-    fn fetch_data(&self, query: Option<&str>) -> Vec<String> {
+    fn fetch_data(&self, _query: Option<&str>) -> Vec<String> {
         let data: Res = reqwest::get("https://swapi.co/api/people/")
             .unwrap()
             .json()
