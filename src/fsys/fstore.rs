@@ -62,7 +62,7 @@ impl FileStore {
                 _ => log::error!("oopsie")
             }
         });
-}
+    }
 
     pub fn write(&mut self, ino: u64, data: &[u8], flags: u32, offset: i64) -> u32 {
         let str = String::from_utf8_lossy(data).trim().to_string();
@@ -75,25 +75,25 @@ impl FileStore {
             match &mut f.data {
                 NodeData::File(file) => {
 
-            let now = SystemTime::now();
-            let old = &file.content;
-            let z: Vec<u8> = old.to_vec();
-            let mut new = z.iter().take(offset as usize).cloned().collect::<Vec<_>>();
+                    let now = SystemTime::now();
+                    let old = &file.content;
+                    let z: Vec<u8> = old.to_vec();
+                    let mut new = z.iter().take(offset as usize).cloned().collect::<Vec<_>>();
 
-            new.extend(data.iter().cloned().collect::<Vec<_>>());
+                    new.extend(data.iter().cloned().collect::<Vec<_>>());
 
-            new.extend(
-                z.iter()
-                    .skip(offset as usize + data.len())
-                    .collect::<Vec<_>>(),
-            );
-            //let z: &[u8] = new.into();
-            file.content = new;
-            let d: &[u8] = &file.content;
-            let s = d.len();
-            f.attr.size = s as u64;
-            f.attr.ctime = now;
-            f.attr.atime = now;
+                    new.extend(
+                        z.iter()
+                        .skip(offset as usize + data.len())
+                        .collect::<Vec<_>>(),
+                        );
+                    //let z: &[u8] = new.into();
+                    file.content = new;
+                    let d: &[u8] = &file.content;
+                    let s = d.len();
+                    f.attr.size = s as u64;
+                    f.attr.ctime = now;
+                    f.attr.atime = now;
 
                 }
                 _ => log::error!("oops")
@@ -126,19 +126,12 @@ impl FileStore {
     }
 
     pub fn create_dir(&mut self, parent: u64, name: &OsStr, _mode: u32) -> Option<&Inode> {
-        let id = self.resolve_path(&parent, name)?;
-        let parent_dir = self.file_table.get(&id)?;
+        let dir = RegularDirNode::new();
+        let node = NodeData::RegularDir(dir);
 
-        match &parent_dir.data {
-            NodeData::RegularDir(p) => {
-                let dir = RegularDirNode::new();
-                let node = NodeData::RegularDir(dir);
+        let id = self.add_child(&parent, node, name);
+        self.get(&id)
 
-                let id = self.add_child(&parent, node, name);
-                self.get(&id)
-            }
-            _ => None
-        }
     }
 
     pub fn remove(&mut self, id: &u64) {
@@ -171,53 +164,53 @@ impl FileStore {
         self.get(&id)
     }
 
-pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {
-    let id: u64 = (self.ino_ctr) as u64;
-    self.ino_ctr += 1;
-    // replace with uid and gid from req
-    let mut node = Inode::new(id, data, name, 1000, 1000);
-    node.id = id;
-    node.attr.ino = id;
-    match &self.file_table.get(parent_id).unwrap().data {
-        NodeData::RegularDir(_) => {
-            self.file_table.insert(id, node);
-        }
-        NodeData::ServiceDir(dir) => {
-            let data = dir.service.fetch_data(name.to_str());
-            let d: &[u8] = &data.join("\n").into_bytes();
-            let s = d.len();
-            node.attr.size = s as u64;
-            match &mut node.data {
-                NodeData::File(f) => {
-                    println!("{:?}", data);
-                    f.content = data.join("\n").into_bytes();
-                }
-                _ => {
-                    log::error!("oops");
-                }
+    pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {
+        let id: u64 = (self.ino_ctr) as u64;
+        self.ino_ctr += 1;
+        // replace with uid and gid from req
+        let mut node = Inode::new(id, data, name, 1000, 1000);
+        node.id = id;
+        node.attr.ino = id;
+        match &self.file_table.get(parent_id).unwrap().data {
+            NodeData::RegularDir(_) => {
+                self.file_table.insert(id, node);
             }
+            NodeData::ServiceDir(dir) => {
+                let data = dir.service.fetch_data(name.to_str());
+                let d: &[u8] = &data.join("\n").into_bytes();
+                let s = d.len();
+                node.attr.size = s as u64;
+                match &mut node.data {
+                    NodeData::File(f) => {
+                        println!("{:?}", data);
+                        f.content = data.join("\n").into_bytes();
+                    }
+                    _ => {
+                        log::error!("oops");
+                    }
+                }
 
 
-            self.file_table.insert(id, node);
+                self.file_table.insert(id, node);
+            }
+            _ => log::error!("not a dir")
         }
-        _ => log::error!("not a dir")
+
+        // consider extracting to method
+        // see rename above
+        let path = name.to_os_string();
+        self.file_table.entry(*parent_id).and_modify(|parent| {
+            match &mut parent.data {
+                NodeData::RegularDir(dir) => {
+                    dir.add(id, path);
+                }
+                _ => ()
+            }
+        });
+        log::error!("new entry: {:?}", self.file_table);
+
+        id
     }
-
-    // consider extracting to method
-    // see rename above
-    let path = name.to_os_string();
-    self.file_table.entry(*parent_id).and_modify(|parent| {
-        match &mut parent.data {
-            NodeData::RegularDir(dir) => {
-                dir.add(id, path);
-            }
-            _ => ()
-        }
-    });
-    log::error!("new entry: {:?}", self.file_table);
-
-    id
-}
 
     pub fn clear_file(&mut self, ino: &u64) {
         self.file_table.entry(*ino).and_modify(|f| {
