@@ -208,6 +208,9 @@ impl FileStore {
                 NodeData::RegularDir(dir) => {
                     dir.add(id, path);
                 }
+                NodeData::ServiceDir(dir) => {
+                    dir.add(id, path);
+                }
                 _ => ()
             }
         });

@@ -187,11 +187,11 @@ reply.error(ENOENT)
         &mut self,
         _req: &Request,
         ino: u64,
-        _fh: u64,
+        fh: u64,
         offset: i64,
         mut reply: ReplyDirectory,
         ) {
-        //log::error!("readdir: {}, {}, {}", ino, fh, offset);
+        log::error!("readdir: {}, {}, {}", ino, fh, offset);
         match self.store.get(&ino) {
             Some(inode) => {
                 match &inode.data {
@@ -229,6 +229,7 @@ reply.error(ENOENT)
                     }
                     NodeData::ServiceDir(node) => {
                         let children = &node.children;
+                        log::error!("service children: {:?}", children);
                         println!("{:?}", children);
                         let mut idx: u64 = 0;
                         let offset = offset as u64;

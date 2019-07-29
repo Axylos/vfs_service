@@ -56,6 +56,11 @@ impl ServiceDirNode {
             service,
         }
     }
+
+    pub fn add(&mut self, id: u64, name: std::ffi::OsString) {
+        self.children.insert(id);
+        self.name_map.insert(name, id);
+    }
 }
 
 impl RegularDirNode {
