@@ -31,7 +31,7 @@ impl Fs {
 
 impl Filesystem for Fs {
     fn init(&mut self, _req: &Request) -> Result<(), i32> {
-        log::debug!("up and running");
+        log::info!("up and running");
 
         Ok(())
     }
@@ -95,7 +95,7 @@ impl Filesystem for Fs {
         mode: u32, 
         reply: ReplyEntry
         ) {
-        log::debug!("creating a dir");
+        log::info!("creating a dir");
 
         let node = self.store.create_dir(parent, name, mode);
         let ttl = Duration::from_secs(1);
@@ -364,7 +364,7 @@ reply.error(ENOENT)
         match self.store.get(&ino) {
             Some(file) => {
                 let ttl = Duration::from_secs(1);
-                log::debug!("found filez: {:?} {:?}", file.attr, ttl);
+                log::info!("found filez: {:?} {:?}", file.attr, ttl);
                 reply.attr(&ttl, &file.attr);
             }
             None => {

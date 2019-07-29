@@ -213,7 +213,7 @@ impl FileStore {
                 _ => ()
             }
         });
-        log::debug!("new entry: {:?}", self.file_table);
+        log::info!("new entry: {:?}", self.file_table);
 
         id
     }
