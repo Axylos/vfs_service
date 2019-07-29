@@ -124,8 +124,12 @@ impl FileStore {
 
     pub fn create_dir(&mut self, parent: u64, name: &OsStr, mode: u32) -> Option<&Inode> {
         let mut dir = DirNode::new();
+        let mut dir2 = DirNode::new();
         let node = NodeData::Dir(dir);
+        let node2 = NodeData::Dir(dir2);
         let id = self.add_child(&parent, node, name);
+        let id2 = self.touch_file(&id, &OsStr::new("newname"));
+        let id3 = self.touch_file(&id, &OsStr::new("newname2"));
 
         self.get(&id)
     }

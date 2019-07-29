@@ -1,4 +1,4 @@
-use std::ffi::{OsStr};
+use std::ffi::{OsStr, OsString};
 use std::time::{SystemTime, Duration};
 use fuse::{
     FileType,
@@ -103,7 +103,9 @@ impl Filesystem for Fs {
         let node = self.store.create_dir(parent, name, mode);
         let ttl = Duration::from_secs(1);
         match node {
-            Some(dir) => reply.entry(&ttl, &dir.attr, dir.id),
+            Some(dir) => {
+                reply.entry(&ttl, &dir.attr, dir.id);
+            }
             _ => reply.error(ENOENT)
         }
     }
