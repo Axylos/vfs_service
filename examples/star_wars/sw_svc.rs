@@ -1,7 +1,7 @@
 use std::fmt;
 use reqwest;
 use serde::Deserialize;
-use crate::fsys::inode::{ServiceDirNode, SingleService};
+use vfs_service::{SingleService};
 
 #[derive(Deserialize, Debug)]
 pub struct Res {
@@ -27,7 +27,7 @@ pub struct StarWarsService {}
 impl SingleService for StarWarsService  {
 
     fn fetch_data(&self, _query: Option<&str>) -> Vec<String> {
-        let data: Res = reqwest::get("https://swapi.co/api/people/")
+        let data: Res = reqwest::get("https://swapi.dev/api/people/")
             .unwrap()
             .json()
             .unwrap();
@@ -36,9 +36,8 @@ impl SingleService for StarWarsService  {
             person.to_string() + "\n"
         }).collect()
     }
-}
 
-pub fn build_sw_service() -> ServiceDirNode {
-    let svc = StarWarsService {};
-    ServiceDirNode::new(Box::new(svc))
+    fn get_name(&self) -> String {
+        "star_wars_svc".to_string()
+    }
 }

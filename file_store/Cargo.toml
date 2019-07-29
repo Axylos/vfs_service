@@ -1,0 +1,19 @@
+[package]
+name = "file_store"
+version = "0.0.1"
+authors = ["Drake Talley robertdraketalley@gmail.com"]
+edition = "2018"
+description = "data mgmt store for vfs"
+license = "MIT"
+homepage = "https://github.com/Axylos/vfs_service"
+repository = "https://github.com/Axylos/vfs_service"
+keywords = ["fuse", "filesystem"]
+
+[dependencies]
+log = "0.4.4"
+time = "0.1.38"
+fuse = "0.3.1"
+
+[dependencies.file_node]
+path = "../file_node"
+version = "0.0.1"

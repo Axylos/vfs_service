@@ -1,0 +1,11 @@
+[package]
+name = "file_node"
+version = "0.0.1"
+authors = ["Drake Talley robertdraketalley@gmail.com"]
+edition = "2018"
+description = "Build data services and expose them as a vfs"
+license = "MIT"
+homepage = "https://github.com/Axylos/vfs_service"
+repository = "https://github.com/Axylos/vfs_service"
+keywords = ["fuse", "filesystem"]
+
