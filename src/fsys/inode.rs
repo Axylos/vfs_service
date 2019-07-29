@@ -2,9 +2,7 @@ use std::collections;
 use std::path;
 use std::ffi::{OsStr, OsString};
 use fuse::{FileAttr, FileType};
-use std::time::{Duration, UNIX_EPOCH, SystemTime};
-
-const USER_DIR: u32 = 0x755;
+use std::time::{Duration, SystemTime};
 
 #[derive(Debug, Clone)]
 pub struct FileNode {
@@ -34,7 +32,7 @@ impl DirNode {
         }
     }
 
-    pub fn remove(&mut self, id: &u64, name: &OsString) {
+    pub fn _remove(&mut self, id: &u64, name: &OsString) {
         self.children.remove(id);
         self.name_map.remove(name);
     }
@@ -64,7 +62,7 @@ pub struct Inode {
 }
 
 impl Inode {
-    pub fn new(id: u64, data: NodeData, name: &OsStr, uid: u32, gid: u32) -> Inode {
+    pub fn new(id: u64, data: NodeData, name: &OsStr, _uid: u32, _gid: u32) -> Inode {
         let ttl = Duration::from_secs(1);
         let path = path::PathBuf::from(name);
         let kind = match data {

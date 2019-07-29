@@ -1,22 +1,19 @@
-use std::ffi::{OsStr, OsString};
+use std::ffi::{OsStr};
 use std::time::{SystemTime, Duration};
 use fuse::{
     FileType,
-    FileAttr,
     Filesystem,
     ReplyAttr,
     ReplyCreate,
     ReplyData, ReplyDirectory, ReplyEmpty,
-    ReplyEntry, ReplyOpen, ReplyWrite, ReplyXattr,
-    ReplyLock,
+    ReplyEntry, ReplyOpen, ReplyWrite,
     Request,
 };
 
 use std::path;
 
 use crate::fsys::fstore::{FileStore};
-use crate::fsys::inode::{NodeData, DirNode, FileNode};
-use time::Timespec;
+use crate::fsys::inode::{NodeData};
 
 use libc::{ENOENT, ENOTDIR};
 
@@ -125,7 +122,6 @@ impl Filesystem for Fs {
         match self.store.get(&id) {
             Some(f) => {
                 let file = f.attr;
-                let now = SystemTime::now();
                 let ttl = Duration::from_secs(1);
                 log::error!("got through create");
                 reply.created(&ttl, &file, id, id, flags);
@@ -191,7 +187,7 @@ reply.error(ENOENT)
         &mut self,
         _req: &Request,
         ino: u64,
-        fh: u64,
+        _fh: u64,
         offset: i64,
         mut reply: ReplyDirectory,
         ) {
@@ -232,14 +228,9 @@ reply.error(ENOENT)
                         reply.ok();
 
                     }
-                    NodeData::File(node) => {
+                    NodeData::File(_node) => {
                         log::error!("file found:");
                         reply.error(ENOENT);
-                    }
-                    _ => {
-
-                    log::error!("this got called");
-reply.error(ENOENT)
                     }
                 }
             }
@@ -344,24 +335,7 @@ reply.error(ENOENT)
     fn getattr(&mut self, _req: &Request, ino: u64, reply: ReplyAttr) {
         match self.store.get(&ino) {
             Some(file) => {
-                let ts = std::time::UNIX_EPOCH;
                 let ttl = Duration::from_secs(1);
-                let attr = FileAttr {
-                    ino: 1,
-                    size: 0,
-                    blocks: 0,
-                    mtime: ts,
-                    atime: ts,
-                    ctime: ts,
-                    crtime: ts,
-                    kind: FileType::Directory,
-                    perm: 0o755,
-                    nlink: 2,
-                    uid: 501,
-                    gid: 20,
-                    rdev: 0,
-                    flags: 0
-                };
                 log::debug!("found filez: {:?} {:?}", file.attr, ttl);
                 reply.attr(&ttl, &file.attr);
             }

@@ -1,7 +1,6 @@
 use std::{path, collections};
 use std::ffi::{OsStr, OsString};
 use crate::fsys::inode::{Inode, NodeData, FileNode, DirNode};
-use fuse::{FileType};
 use std::time::{SystemTime};
 
 const UID: u32 = 1000;
@@ -28,7 +27,7 @@ impl FileStore {
         f
     }
 
-    pub fn add_node(&mut self, parent: &u64, node: &Inode, path: OsString) {
+    pub fn _add_node(&mut self, _parent: &u64, node: &Inode, path: OsString) {
         self.file_table.entry(node.id).and_modify(|parent| {
             match &mut parent.data {
                 NodeData::Dir(dir) => {
@@ -122,14 +121,18 @@ impl FileStore {
         log::error!("{:?}", self.file_table);
     }
 
-    pub fn create_dir(&mut self, parent: u64, name: &OsStr, mode: u32) -> Option<&Inode> {
-        let mut dir = DirNode::new();
-        let mut dir2 = DirNode::new();
+    pub fn create_dir(&mut self, parent: u64, name: &OsStr, _mode: u32) -> Option<&Inode> {
+        let dir = DirNode::new();
         let node = NodeData::Dir(dir);
-        let node2 = NodeData::Dir(dir2);
         let id = self.add_child(&parent, node, name);
+
+        /*
+         * insanity for testing multiple store ops
+        let mut dir2 = DirNode::new();
+        let node2 = NodeData::Dir(dir2);
         let id2 = self.touch_file(&id, &OsStr::new("newname"));
         let id3 = self.touch_file(&id, &OsStr::new("newname2"));
+        */
 
         self.get(&id)
     }
@@ -155,15 +158,12 @@ impl FileStore {
     }
 
     pub fn lookup_path(&mut self, parent: &u64, name: &OsStr) -> Option<&Inode> {
-        // double the work so the result of an
-        // immutable borrow is not used for a mutable borrow
         let id = self.resolve_path(parent, name)?;
 
-        self.file_table.entry(*id).and_modify(|file| {
+        self.file_table.entry(id).and_modify(|file| {
             file.access();
         });
 
-        let id = self.resolve_path(parent, name).unwrap();
         self.get(&id)
     }
 
@@ -205,16 +205,16 @@ impl FileStore {
 
 
     pub fn touch_file(&mut self, parent: &u64, name: &OsStr) -> u64 {
-        let mut file = FileNode::new();
+        let file = FileNode::new();
         let node = NodeData::File(file);
         self.add_child(parent, node, name)
     }
 
-    fn resolve_path(&self, parent: &u64, name: &OsStr) -> Option<&u64> {
+    fn resolve_path(&self, parent: &u64, name: &OsStr) -> Option<u64> {
         let parent = self.get(parent).unwrap();
         match &parent.data {
             NodeData::Dir(dir) => {
-                dir.name_map.get(name)
+                Some(dir.name_map.get(name)?.clone())
             }
             _ => None
         }
