@@ -24,13 +24,6 @@ impl fmt::Display for Person {
 }
 
 pub struct StarWarsService {}
-impl StarWarsService {
-    pub fn new() -> StarWarsService {
-        StarWarsService {
-        }
-    }
-
-}
 
 impl SingleService for StarWarsService  {
 
@@ -46,4 +39,9 @@ impl SingleService for StarWarsService  {
             person.to_string() + "\n"
         }).collect()
     }
+}
+
+pub fn build_sw_service() -> ServiceDirNode {
+    let svc = StarWarsService {};
+    ServiceDirNode::new(Box::new(svc))
 }

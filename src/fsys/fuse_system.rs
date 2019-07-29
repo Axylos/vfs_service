@@ -235,9 +235,6 @@ reply.error(ENOENT)
                             idx = offset - 2;
                         }
 
-
-                        let items = node.service.svc.fetch_data(Some("foo"));
-
                         let len = children.len() as u64;
                         println!("called");
                         if offset < len + 1 as u64 {

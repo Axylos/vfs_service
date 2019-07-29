@@ -3,8 +3,8 @@ use std::path;
 use std::ffi::{OsStr, OsString};
 use fuse::{FileAttr, FileType};
 use std::time::{Duration, SystemTime};
-
 use std::fmt;
+
 #[derive(Debug, Clone)]
 pub struct FileNode {
     pub content: Vec<u8>,
@@ -39,6 +39,14 @@ pub struct Service {
     pub svc: Box<dyn SingleService>,
 }
 
+impl Service {
+    pub fn new(svc: Box<dyn SingleService>) -> Service {
+        Service {
+            svc
+        }
+    }
+}
+
 impl std::fmt::Debug for SingleService + 'static {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "it worked")
@@ -50,13 +58,20 @@ impl std::fmt::Debug for SingleService + 'static {
 pub struct ServiceDirNode {
     pub children: collections::BTreeSet<u64>,
     pub name_map: collections::HashMap<OsString, u64>,
-    pub service: Service
+    pub service: Box<dyn SingleService>
 }
 
 impl ServiceDirNode {
+    pub fn new(service: Box<dyn SingleService>) -> ServiceDirNode {
+        ServiceDirNode {
+            children: collections::BTreeSet::new(),
+            name_map: collections::HashMap::new(),
+            service,
+        }
+    }
 
     fn get_data(&self, query: Option<&str>) -> Vec<String> {
-        self.service.svc.fetch_data(query)
+        self.service.fetch_data(query)
     }
 
     fn remove(&mut self, id: &u64, name: &OsStr) {

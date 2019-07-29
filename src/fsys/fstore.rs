@@ -2,6 +2,7 @@ use std::{path, collections};
 use std::ffi::{OsStr, OsString};
 use crate::fsys::inode::{Inode, NodeData, FileNode, RegularDirNode, DirNode};
 use std::time::{SystemTime};
+use crate::sw_svc::build_sw_service;
 
 const UID: u32 = 1000;
 const GID: u32 = 1000;
@@ -24,6 +25,12 @@ impl FileStore {
         let node = Inode::new(fuse::FUSE_ROOT_ID, node_data, &name, UID, GID);
 
         f.file_table.insert(1, node);
+
+        let svc = build_sw_service();
+        let one = 1;
+        let svc_node = NodeData::ServiceDir(svc);
+        f.add_child(&one, svc_node, OsStr::new("sw_svc"));
+
         f
     }
 
@@ -173,29 +180,53 @@ impl FileStore {
         self.get(&id)
     }
 
-    pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {
-        let id: u64 = (self.ino_ctr) as u64;
-        self.ino_ctr += 1;
-        // replace with uid and gid from req
-        let mut node = Inode::new(id, data, name, 1000, 1000);
-        node.id = id;
-        node.attr.ino = id;
-        self.file_table.insert(id, node);
-        // consider extracting to method
-        // see rename above
-        let path = name.to_os_string();
-        self.file_table.entry(*parent_id).and_modify(|parent| {
-            match &mut parent.data {
-                NodeData::RegularDir(dir) => {
-                    dir.add(id, path);
+pub fn add_child(&mut self, parent_id: &u64, data: NodeData, name: &OsStr) -> u64 {
+    let id: u64 = (self.ino_ctr) as u64;
+    self.ino_ctr += 1;
+    // replace with uid and gid from req
+    let mut node = Inode::new(id, data, name, 1000, 1000);
+    node.id = id;
+    node.attr.ino = id;
+    match &self.file_table.get(parent_id).unwrap().data {
+        NodeData::RegularDir(_) => {
+            self.file_table.insert(id, node);
+        }
+        NodeData::ServiceDir(dir) => {
+            let data = dir.service.fetch_data(name.to_str());
+            let d: &[u8] = &data.join("\n").into_bytes();
+            let s = d.len();
+            node.attr.size = s as u64;
+            match &mut node.data {
+                NodeData::File(f) => {
+                    println!("{:?}", data);
+                    f.content = data.join("\n").into_bytes();
                 }
-                _ => ()
+                _ => {
+                    log::error!("oops");
+                }
             }
-        });
-        log::error!("new entry: {:?}", self.file_table);
 
-        id
+
+            self.file_table.insert(id, node);
+        }
+        _ => log::error!("not a dir")
     }
+
+    // consider extracting to method
+    // see rename above
+    let path = name.to_os_string();
+    self.file_table.entry(*parent_id).and_modify(|parent| {
+        match &mut parent.data {
+            NodeData::RegularDir(dir) => {
+                dir.add(id, path);
+            }
+            _ => ()
+        }
+    });
+    log::error!("new entry: {:?}", self.file_table);
+
+    id
+}
 
     pub fn clear_file(&mut self, ino: &u64) {
         self.file_table.entry(*ino).and_modify(|f| {
