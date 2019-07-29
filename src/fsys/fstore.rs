@@ -126,7 +126,6 @@ impl FileStore {
             NodeData::RegularDir(p) => {
                 let dir = RegularDirNode::new();
                 let node = NodeData::RegularDir(dir);
-                let i = p.get_stuff();
 
                 let id = self.add_child(&parent, node, name);
                 self.get(&id)

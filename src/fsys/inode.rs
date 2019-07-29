@@ -4,6 +4,7 @@ use std::ffi::{OsStr, OsString};
 use fuse::{FileAttr, FileType};
 use std::time::{Duration, SystemTime};
 
+use std::fmt;
 #[derive(Debug, Clone)]
 pub struct FileNode {
     pub content: Vec<u8>,
@@ -23,48 +24,41 @@ pub struct RegularDirNode {
     pub name_map: collections::HashMap<OsString, u64>,
 }
 
+#[derive(Debug, Clone)]
 pub struct BundleServiceDirNode {
     pub children: collections::BTreeSet<u64>,
     pub name_map: collections::HashMap<OsString, u64>,
 }
 
+pub trait SingleService {
+    fn fetch_data(&self, query: Option<&str>) -> Vec<String>;
+}
+
+#[derive(Debug)]
+pub struct Service {
+    pub svc: Box<dyn SingleService>,
+}
+
+impl std::fmt::Debug for SingleService + 'static {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "it worked")
+    }
+
+}
+
+#[derive(Debug)]
 pub struct ServiceDirNode {
     pub children: collections::BTreeSet<u64>,
     pub name_map: collections::HashMap<OsString, u64>,
-}
-
-pub trait SingleService {
-    fn fetch_data(query: Option<&str>) -> Result<(u64), Box<dyn std::error::Error>>;
-}
-
-pub struct NumSvc {
-    pub data: u64
-}
-
-impl SingleService for NumSvc {
-    fn fetch_data(query: Option<&str>) -> Result<(u64), Box<dyn std::error::Error>> { 
-        match query {
-            Some(q) => {
-                let len = q.len() as u64;
-                Ok(len)
-            }
-            None => Ok(0)
-        }
-    }
+    pub service: Service
 }
 
 impl ServiceDirNode {
-    pub fn new(svc: impl SingleService) -> ServiceDirNode {
-        ServiceDirNode {
-            children: collections::BTreeSet::new(),
-            name_map: collections::HashMap::new(),
-        }
+
+    fn get_data(&self, query: Option<&str>) -> Vec<String> {
+        self.service.svc.fetch_data(query)
     }
 
-}
-
-
-impl DirNode for ServiceDirNode {
     fn remove(&mut self, id: &u64, name: &OsStr) {
         self.children.remove(id);
         self.name_map.remove(name);
@@ -76,6 +70,24 @@ impl DirNode for ServiceDirNode {
     }
 }
 
+
+pub struct NumSvc {
+    pub data: u64
+}
+
+impl SingleService for NumSvc {
+    fn fetch_data(&self, query: Option<&str>) -> Vec<String> { 
+        match query {
+            Some(q) => {
+                let len = q.len() as u64;
+                vec!("foo".to_string())
+            }
+            None => vec!("foo".to_string())
+        }
+    }
+}
+
+
 impl RegularDirNode {
     pub fn new() -> RegularDirNode {
         RegularDirNode {
@@ -84,8 +96,6 @@ impl RegularDirNode {
 
         }
     }
-
-    pub fn get_stuff(&self) -> u64 { 4 }
 }
 
 
@@ -111,6 +121,7 @@ pub trait DirNode {
 pub enum NodeData {
     File(FileNode),
     RegularDir(RegularDirNode),
+    ServiceDir(ServiceDirNode)
 }
 
 
@@ -130,7 +141,8 @@ impl Inode {
         let path = path::PathBuf::from(name);
         let kind = match data {
             NodeData::File(_) => FileType::RegularFile,
-            NodeData::RegularDir(_) => FileType::Directory
+            NodeData::RegularDir(_) => FileType::Directory,
+            NodeData::ServiceDir(_) => FileType::Directory,
         };
         let mut attr = build_dummy_file(kind);
         attr.uid = 501;

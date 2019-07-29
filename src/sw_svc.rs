@@ -1,16 +1,49 @@
-use std::collections::HashMap;
+use std::fmt;
+use std::collections::{HashMap, BTreeSet};
 use reqwest;
 use serde_json;
+use serde::Deserialize;
 use crate::fsys::inode::{ServiceDirNode, SingleService};
 
+#[derive(Deserialize, Debug)]
+pub struct Res {
+    pub results: Vec<Person>
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Person {
+    gender: String,
+    name: String,
+}
+
+impl fmt::Display for Person {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "The person's name is: {}\n and they are {}", self.name, self.gender)
+    }
+
+}
+
 pub struct StarWarsService {}
+impl StarWarsService {
+    pub fn new() -> StarWarsService {
+        StarWarsService {
+        }
+    }
+
+}
 
 impl SingleService for StarWarsService  {
-    fn fetch_data(query: Option<&str>) -> Result<(u64), Box<dyn std::error::Error>> {
-        let resp: HashMap<String, serde_json::Value> = reqwest::get("https://swapi.co/api/people/")?
-            .json()?;
+
+    fn fetch_data(&self, query: Option<&str>) -> Vec<String> {
+        let data: Res = reqwest::get("https://swapi.co/api/people/")
+            .unwrap()
+            .json()
+            .unwrap();
 
 
-        Ok(3)
+
+        data.results.iter().map(|person| {
+            person.to_string() + "\n"
+        }).collect()
     }
 }

@@ -196,7 +196,6 @@ reply.error(ENOENT)
             Some(inode) => {
                 match &inode.data {
                     NodeData::RegularDir(node) => {
-                    log::error!("called");
                         let children = &node.children;
                         let mut idx: u64 = 0;
                         let offset = offset as u64;
@@ -227,6 +226,40 @@ reply.error(ENOENT)
                         }
                         reply.ok();
 
+                    }
+                    NodeData::ServiceDir(node) => {
+                        let children = &node.children;
+                        let mut idx: u64 = 0;
+                        let offset = offset as u64;
+                        if offset > 2 {
+                            idx = offset - 2;
+                        }
+
+
+                        let items = node.service.svc.fetch_data(Some("foo"));
+
+                        let len = children.len() as u64;
+                        println!("called");
+                        if offset < len + 1 as u64 {
+                            reply.add(1, 0, FileType::Directory, &path::Path::new("."));
+                            reply.add(1, 1, FileType::Directory, &path::Path::new(".."));
+                            let mut ctr = 2 + offset as i64;
+                            for id in children.range(idx..) {
+                                match self.store.get(&id) {
+                                    Some(f) => {
+                                        reply.add(f.id, ctr, f.attr.kind, &f.path);
+                                        ctr += 1;
+                                        log::error!("{:?}", f);
+                                    }
+                                    None => log::error!(
+                                        "dangling child reference: parent={} child={}",
+                                        &ino,
+                                        &id
+                                        ),
+                                }
+                            }
+                        }
+                        reply.ok();
                     }
                     NodeData::File(_node) => {
                         log::error!("file found:");
