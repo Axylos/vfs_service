@@ -186,7 +186,6 @@ impl FileStore {
                 node.attr.size = s as u64;
                 match &mut node.data {
                     NodeData::File(f) => {
-                        println!("{:?}", data);
                         f.content = data.join("\n").into_bytes();
                     }
                     _ => {
@@ -214,7 +213,7 @@ impl FileStore {
                 _ => ()
             }
         });
-        log::error!("new entry: {:?}", self.file_table);
+        log::debug!("new entry: {:?}", self.file_table);
 
         id
     }

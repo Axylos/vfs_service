@@ -4,11 +4,8 @@ mod sw_svc;
 mod weather_svc;
 mod fsys;
 
-mod wiki;
 fn main() {
     logger::init();
-    let str = wiki::query();
-    println!("{:?}", str);
 
     let mnt = match env::args().nth(1) {
         Some(path) => path,

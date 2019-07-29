@@ -135,7 +135,6 @@ impl Filesystem for Fs {
 
 
     fn read(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, _size: u32, reply: ReplyData) {
-        println!("read");
         match self.store.get(&ino) {
             Some(f) => {
                 match &f.data {
@@ -204,7 +203,6 @@ reply.error(ENOENT)
                         }
 
                         let len = children.len() as u64;
-                        println!("called");
                         if offset < len + 1 as u64 {
                             reply.add(1, 0, FileType::Directory, &path::Path::new("."));
                             reply.add(1, 1, FileType::Directory, &path::Path::new(".."));
@@ -230,7 +228,6 @@ reply.error(ENOENT)
                     NodeData::ServiceDir(node) => {
                         let children = &node.children;
                         log::error!("service children: {:?}", children);
-                        println!("{:?}", children);
                         let mut idx: u64 = 0;
                         let offset = offset as u64;
                         if offset > 2 {
@@ -238,7 +235,6 @@ reply.error(ENOENT)
                         }
 
                         let len = children.len() as u64;
-                        println!("called");
                         if offset < len + 1 as u64 {
                             reply.add(1, 0, FileType::Directory, &path::Path::new("."));
                             reply.add(1, 1, FileType::Directory, &path::Path::new(".."));

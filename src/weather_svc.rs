@@ -17,7 +17,7 @@ pub struct Weather {
 
 impl fmt::Display for Weather {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "The temp is {} and the pressure is {}", self.temp, self.pressure)
+        write!(f, "The temp is {}C and the pressure is {}atm", self.temp, self.pressure)
     }
 }
 
@@ -30,16 +30,18 @@ pub struct WeatherService {}
 
 impl SingleService for WeatherService  {
 
-    fn fetch_data(&self, _query: Option<&str>) -> Vec<String> {
+    fn fetch_data(&self, query: Option<&str>) -> Vec<String> {
         dotenv().ok();
+        let zip = match query {
+            Some(q) => q,
+            None => "10002"
+        };
 
-        let mut str = String::new();
         let appid = env::var("WEATHER_KEY").unwrap().to_string();
-        let url= "https://samples.openweathermap.org/data/2.5/weather?zip=94040,us&appid=";
-        str.push_str(&url);
-        str.push_str(&appid);
+        let url= format!("https://api.openweathermap.org/data/2.5/weather?zip={},us&appid={}&units=metric",
+                         zip, appid);
 
-        let data: Meta = reqwest::get(&str)
+        let data: Meta = reqwest::get(&url)
             .unwrap()
             .json()
             .unwrap();
