@@ -229,6 +229,7 @@ reply.error(ENOENT)
                     }
                     NodeData::ServiceDir(node) => {
                         let children = &node.children;
+                        println!("{:?}", children);
                         let mut idx: u64 = 0;
                         let offset = offset as u64;
                         if offset > 2 {

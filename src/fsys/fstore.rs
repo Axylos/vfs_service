@@ -139,15 +139,6 @@ impl FileStore {
             }
             _ => None
         }
-
-        /*
-         * insanity for testing multiple store ops
-        let mut dir2 = DirNode::new();
-        let node2 = NodeData::Dir(dir2);
-        let id2 = self.touch_file(&id, &OsStr::new("newname"));
-        let id3 = self.touch_file(&id, &OsStr::new("newname2"));
-        */
-
     }
 
     pub fn remove(&mut self, id: &u64) {
