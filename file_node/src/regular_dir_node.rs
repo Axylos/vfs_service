@@ -1,6 +1,6 @@
+use crate::node_data::DirNode;
 use std::collections;
 use std::ffi::{OsStr, OsString};
-use crate::node_data::DirNode;
 
 #[derive(Debug, Clone)]
 pub struct RegularDirNode {

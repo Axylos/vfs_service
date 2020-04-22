@@ -6,8 +6,7 @@ pub struct FileNode {
 impl FileNode {
     pub fn new() -> FileNode {
         FileNode {
-            content: Vec::new()
+            content: Vec::new(),
         }
     }
 }
-

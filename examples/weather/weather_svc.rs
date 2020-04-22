@@ -1,12 +1,11 @@
-use std::fmt;
 use reqwest;
 use serde::Deserialize;
-use vfs_service::{SingleService};
+use std::fmt;
+use vfs_service::SingleService;
 extern crate dotenv;
 
 use dotenv::dotenv;
 use std::env;
-
 
 #[derive(Debug, Deserialize)]
 pub struct Weather {
@@ -16,7 +15,11 @@ pub struct Weather {
 
 impl fmt::Display for Weather {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "The temp is {}C and the pressure is {}atm", self.temp, self.pressure)
+        write!(
+            f,
+            "The temp is {}C and the pressure is {}atm",
+            self.temp, self.pressure
+        )
     }
 }
 
@@ -28,13 +31,16 @@ pub struct Meta {
 
 impl fmt::Display for Meta {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "The temp is {}C and the pressure is {}atm for {}", self.main.temp, self.main.pressure, self.name)
+        write!(
+            f,
+            "The temp is {}C and the pressure is {}atm for {}",
+            self.main.temp, self.main.pressure, self.name
+        )
     }
 }
 pub struct WeatherService {}
 
-impl SingleService for WeatherService  {
-
+impl SingleService for WeatherService {
     fn get_name(&self) -> String {
         "weather_svc".to_string()
     }
@@ -43,20 +49,17 @@ impl SingleService for WeatherService  {
         dotenv().ok();
         let zip = match query {
             Some(q) => q,
-            None => "10002"
+            None => "10002",
         };
 
         let appid = env::var("WEATHER_KEY").unwrap().to_string();
-        let url= format!("https://api.openweathermap.org/data/2.5/weather?zip={},us&appid={}&units=metric",
-                         zip, appid);
+        let url = format!(
+            "https://api.openweathermap.org/data/2.5/weather?zip={},us&appid={}&units=metric",
+            zip, appid
+        );
 
-        let data: Meta = reqwest::get(&url)
-            .unwrap()
-            .json()
-            .unwrap();
+        let data: Meta = reqwest::get(&url).unwrap().json().unwrap();
 
-
-
-        vec!(data.to_string())
+        vec![data.to_string()]
     }
 }

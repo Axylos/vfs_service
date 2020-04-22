@@ -1,28 +1,21 @@
-use std::{env, io};
-use vfs_service::{fuse_system};
 use log::*;
-use syslog::{Facility};
+use std::{env, io};
+use syslog::Facility;
+use vfs_service::fuse_system;
 
 fn init() {
-
-    match syslog::init(
-        Facility::LOG_USER,
-        LevelFilter::Debug,
-        "file system".into(),
-    ) {
+    match syslog::init(Facility::LOG_USER, LevelFilter::Debug, "file system".into()) {
         Ok(()) => log::info!("logger up"),
         _ => log::error!("logger not up"),
     }
 
     log::info!("logging started");
-
 }
 
 fn main() {
-
     init();
     unsafe {
-        let fs = fuse_system::Fs::new(vec!());
+        let fs = fuse_system::Fs::new(vec![]);
 
         let mnt = match env::args().nth(1) {
             Some(path) => path,

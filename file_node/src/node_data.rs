@@ -1,7 +1,7 @@
-use std::ffi::OsStr;
 use crate::file_node::FileNode;
 use crate::regular_dir_node::RegularDirNode;
 use crate::service_node::ServiceDirNode;
+use std::ffi::OsStr;
 
 pub trait DirNode {
     fn remove(&mut self, id: &u64, name: &OsStr);
@@ -12,7 +12,7 @@ pub trait DirNode {
 pub enum NodeData {
     File(FileNode),
     RegularDir(RegularDirNode),
-    ServiceDir(ServiceDirNode)
+    ServiceDir(ServiceDirNode),
 }
 
 pub fn gen_dir_node() -> NodeData {

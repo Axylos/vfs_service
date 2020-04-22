@@ -1,12 +1,11 @@
 use std::collections;
-use std::path;
 use std::ffi::{OsStr, OsString};
-use time::Timespec;
-use std::fmt;
+use std::path;
 use time;
+use time::Timespec;
 
 extern crate file_node;
-use file_node::{NodeData};
+use file_node::NodeData;
 use fuse::{FileAttr, FileType};
 
 #[derive(Debug)]
@@ -39,15 +38,12 @@ impl Inode {
             ttl,
             xattr: collections::HashMap::new(),
         }
-
     }
-
 
     pub fn access(&mut self) {
         let now = time::get_time();
         self.attr.atime = now;
     }
-
 }
 
 fn build_dummy_file(kind: FileType) -> FileAttr {
@@ -70,4 +66,3 @@ fn build_dummy_file(kind: FileType) -> FileAttr {
         uid: 0,
     }
 }
-

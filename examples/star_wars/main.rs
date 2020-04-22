@@ -5,7 +5,7 @@ use sw_svc::StarWarsService;
 
 fn main() {
     let star = Box::new(StarWarsService {});
-    let svcs: Vec<Box<dyn SingleService + Send>> = vec!(star);
+    let svcs: Vec<Box<dyn SingleService + Send>> = vec![star];
 
     unsafe {
         let fs = fuse_system::Fs::new(svcs);

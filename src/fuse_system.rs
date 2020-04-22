@@ -1,32 +1,27 @@
-use std::ffi::{OsStr};
-use time::Timespec;
 use fuse::{
-    FileType,
-    Filesystem,
-    ReplyAttr,
-    ReplyCreate,
-    ReplyData, ReplyDirectory, ReplyEmpty,
-    ReplyEntry, ReplyOpen, ReplyWrite,
-    Request,
+    FileType, Filesystem, ReplyAttr, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty,
+    ReplyEntry, ReplyOpen, ReplyWrite, Request,
 };
+use std::ffi::OsStr;
+use time::Timespec;
 
 use std::path;
 
 extern crate file_store;
-use file_store::fstore::{FileStore};
+use file_store::fstore::FileStore;
 
 use file_node::SingleService;
 
 use libc::{ENOENT, ENOTDIR};
 
 pub struct Fs {
-    store: FileStore
+    store: FileStore,
 }
 
 impl Fs {
     pub fn new(svcs: Vec<Box<dyn SingleService + Send>>) -> Fs {
         let mut fs = Fs {
-            store: FileStore::new()
+            store: FileStore::new(),
         };
 
         fs.register_services(svcs);
@@ -48,7 +43,7 @@ impl Filesystem for Fs {
 
     fn access(&mut self, _req: &Request, ino: u64, mask: u32, reply: ReplyEmpty) {
         log::error!("access: {} {}", ino, mask);
-                reply.ok();
+        reply.ok();
     }
 
     fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
@@ -67,46 +62,30 @@ impl Filesystem for Fs {
                 reply.error(ENOENT);
             }
         }
-
     }
 
-    fn rmdir(
-        &mut self, 
-        _req: &Request, 
-        parent: u64, 
-        name: &OsStr, 
-        reply: ReplyEmpty
-
-        ) {
+    fn rmdir(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEmpty) {
         log::error!("unlink {} {:?}", parent, name);
         self.store.unlink(&parent, name);
         reply.ok();
     }
 
     fn rename(
-        &mut self, 
-        _req: &Request, 
-        parent: u64, 
-        name: &OsStr, 
-        newparent: u64, 
-        newname: &OsStr, 
-        reply: ReplyEmpty
-        ) {
+        &mut self,
+        _req: &Request,
+        parent: u64,
+        name: &OsStr,
+        newparent: u64,
+        newname: &OsStr,
+        reply: ReplyEmpty,
+    ) {
         match self.store.rename(&parent, name, newparent, newname) {
             Ok(_) => reply.ok(),
-            Err(_) => reply.error(ENOENT)
+            Err(_) => reply.error(ENOENT),
         }
     }
 
-
-    fn mkdir(
-        &mut self, 
-        _req: &Request, 
-        parent: u64, 
-        name: &OsStr, 
-        mode: u32, 
-        reply: ReplyEntry
-        ) {
+    fn mkdir(&mut self, _req: &Request, parent: u64, name: &OsStr, mode: u32, reply: ReplyEntry) {
         log::info!("creating a dir");
 
         let node = self.store.create_dir(parent, name, mode);
@@ -115,7 +94,7 @@ impl Filesystem for Fs {
             Some(dir) => {
                 reply.entry(&ttl, &dir.attr, dir.id);
             }
-            _ => reply.error(ENOENT)
+            _ => reply.error(ENOENT),
         }
     }
 
@@ -145,8 +124,15 @@ impl Filesystem for Fs {
         }
     }
 
-
-    fn read(&mut self, _req: &Request, ino: u64, _fh: u64, offset: i64, _size: u32, reply: ReplyData) {
+    fn read(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        _fh: u64,
+        offset: i64,
+        _size: u32,
+        reply: ReplyData,
+    ) {
         match self.store.read_file(&ino) {
             Some(data) => {
                 // need to also restrict length of response by size bytes
@@ -154,7 +140,7 @@ impl Filesystem for Fs {
 
                 reply.data(&d)
             }
-            None => reply.error(ENOENT)
+            None => reply.error(ENOENT),
         }
     }
 
@@ -186,7 +172,7 @@ impl Filesystem for Fs {
         fh: u64,
         offset: i64,
         mut reply: ReplyDirectory,
-        ) {
+    ) {
         log::error!("readdir: {}, {}, {}", ino, fh, offset);
         match self.store.read_dir_children(&ino) {
             Some(children) => {
@@ -217,24 +203,22 @@ impl Filesystem for Fs {
                     }
                 }
                 reply.ok();
-
             }
-            None => reply.error(ENOENT)
-
+            None => reply.error(ENOENT),
         }
     }
 
     /*
     fn getlk(
-        &mut self, 
-        _req: &Request, 
-        _ino: u64, 
-        _fh: u64, 
-        _lock_owner: u64, 
-        _start: u64, 
-        _end: u64, 
-        _typ: u32, 
-        _pid: u32, 
+        &mut self,
+        _req: &Request,
+        _ino: u64,
+        _fh: u64,
+        _lock_owner: u64,
+        _start: u64,
+        _end: u64,
+        _typ: u32,
+        _pid: u32,
         _reply: ReplyLock
         ) {
         log::error!("getlk!");
@@ -275,20 +259,18 @@ impl Filesystem for Fs {
             chgtime,
             bkuptime,
             flags
-            );
+        );
         let now = Timespec::new(1, 0);
         if let Some(_) = size {
             self.store.clear_file(&ino);
         }
         let file = self.store.get(&ino).unwrap();
         reply.attr(&now, &file.attr);
-
     }
 
     fn flush(&mut self, _req: &Request, ino: u64, fh: u64, lock_owner: u64, reply: ReplyEmpty) {
         log::error!("flush: {}, {}, {}", ino, fh, lock_owner);
         reply.ok();
-
     }
 
     fn release(
@@ -300,8 +282,7 @@ impl Filesystem for Fs {
         lock_owner: u64,
         flush: bool,
         reply: ReplyEmpty,
-
-        ) {
+    ) {
         log::error!("release {} {} {} {} {}", ino, fh, flags, lock_owner, flush);
         reply.ok();
     }
@@ -324,11 +305,10 @@ impl Filesystem for Fs {
                 reply.attr(&ttl, &file.attr);
             }
             None => {
-                log::error!("none found! {:?}", ino, );
+                log::error!("none found! {:?}", ino,);
                 reply.error(ENOENT);
             }
         }
-
     }
 
     fn unlink(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEmpty) {
@@ -336,5 +316,4 @@ impl Filesystem for Fs {
         self.store.unlink(&parent, name);
         reply.ok();
     }
-
 }

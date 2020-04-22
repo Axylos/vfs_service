@@ -1,5 +1,5 @@
 use std::collections;
-use std::ffi::{OsString};
+use std::ffi::OsString;
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -13,7 +13,7 @@ pub trait SingleService {
     fn get_name(&self) -> String;
 }
 
-impl std::fmt::Debug for SingleService + 'static + Send {
+impl std::fmt::Debug for dyn SingleService + 'static + Send {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "it worked")
     }
@@ -23,7 +23,7 @@ impl std::fmt::Debug for SingleService + 'static + Send {
 pub struct ServiceDirNode {
     pub children: collections::BTreeSet<u64>,
     pub name_map: collections::HashMap<OsString, u64>,
-    pub service: Box<dyn SingleService + Send>
+    pub service: Box<dyn SingleService + Send>,
 }
 
 impl ServiceDirNode {
