@@ -1,6 +1,6 @@
 [package]
 name = "vfs_service"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Drake Talley robertdraketalley@gmail.com"]
 edition = "2018"
 description = "Build data services and expose them as a vfs"
